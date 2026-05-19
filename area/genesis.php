@@ -21,7 +21,7 @@ Genesis::init();
 
 class Genesis
 {
-    static function init()
+    static function init(): void
     {
         self::load_orm();
         self::load_extensions();
@@ -29,7 +29,8 @@ class Genesis
         self::load_model();
     }
     
-    static function load_orm(){
+    static function load_orm(): void
+    {
         $ormDir = __DIR__.'/ORM/';
         if (is_dir($ormDir)) {
             foreach (glob($ormDir . '*.orm.php') as $ormFile) {
@@ -39,7 +40,7 @@ class Genesis
         }
     }
     
-    static function load_extensions()
+    static function load_extensions(): void
     {
         $extensionsDir = __DIR__.'/extensions/';
         if (is_dir($extensionsDir)) {
@@ -50,7 +51,7 @@ class Genesis
         }
     }
     
-    static function load_lib()
+    static function load_lib(): void
     {
         $libDir = __DIR__.'/../libs/';
         if (is_dir($libDir)) {
@@ -60,7 +61,7 @@ class Genesis
         }
     }
     
-    static function load_model()
+    static function load_model(): void
     {
         spl_autoload_register(function ($class) {
             $normalizedClass = str_replace("\\", "/", $class); // For supporting namespace
