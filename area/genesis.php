@@ -2,7 +2,7 @@
 namespace AreaCore;
 
 const _ = null;
-const AreaCore = "v2.0.1";
+const AreaCore = "v2.0.2";
 
 if (php_sapi_name() == "cli"){ // CLI MODE
     define('EOL', PHP_EOL);

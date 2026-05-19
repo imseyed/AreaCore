@@ -11,8 +11,8 @@ class PDO_SQL
 {
     static ?PDO $connection = null;
     static ?PDO $connectionNoBuffer = null;
-    static string $error;
-    static array $config;
+    static string $error = "";
+    static array $config = [];
     
     static array $BUFFER_CONFIG = [
         /**
@@ -42,15 +42,15 @@ class PDO_SQL
     
     static function initial($config): true
     {
-        if (empty($config['dbname'])){
+        if (empty(@$config['dbname'])){
             self::$error .= "Database name is not set!".EOL;
             // But don't throw any exception because may create db now
         }
-        if (!in_array($config['mode'], PDO::getAvailableDrivers())){
+        if (!in_array(@$config['mode'], PDO::getAvailableDrivers())){
             self::$error = "Database mode is not supported.".EOL;
             throw new Exception(self::$error);
         }
-        if (empty($config['hostname']) || empty($config['username']) || !isset($config['password'])){
+        if (empty(@$config['hostname']) || empty(@$config['username']) || !isset($config['password'])){
             self::$error = "Database config is not set!".EOL;
             throw new Exception(self::$error);
         }
@@ -61,8 +61,11 @@ class PDO_SQL
     public function __construct($noBuffer = false)
     {
         // Was connected
-        if (self::$connection instanceof PDO)
+        if (!$noBuffer && self::$connection instanceof PDO)
             return self::$connection;
+        
+        if ($noBuffer && self::$connectionNoBuffer instanceof PDO)
+            return self::$connectionNoBuffer;
         
         $config = self::$config;
         
@@ -71,9 +74,9 @@ class PDO_SQL
         $port = $config['port'] ?: 3306;
         $username = $config['username'];
         $password = $config['password'];
-        $dbname = $config['dbname'];
-        $charset = $config['charset'] ?: 'utf8mb4';
-        $timeout = $config['timeout'];
+        $dbname = $config['dbname'] ?? "";
+        $charset = $config['charset'] ?? 'utf8mb4';
+        $timeout = $config['timeout'] ?? null;
         
         try {
             $DSN = "mysql:host=$hostname;port=$port;dbname=$dbname;charset=$charset";
@@ -127,14 +130,14 @@ class PDO_SQL
     
     ### Query methods
     
-    public static function run_exec(string $query, array $params = []): false|int|null
+    public static function run_exec(string $query, array $params = []): false|int
     {
-        new self; if (!self::$connection) return null;
+        new self; if (!self::$connection) return false;
         
         try {
             return self::$connection->exec($query);
         } catch (PDOException $e) {
-            self::$error .= $e->getMessage();
+            self::$error .= $e->getMessage().EOL;
             return false;
         }
     }
@@ -147,7 +150,7 @@ class PDO_SQL
             $stmt = self::$connection->query($query);
             return new PDO_Fetch($stmt);
         } catch (PDOException $e) {
-            self::$error .= $e->getMessage();
+            self::$error .= $e->getMessage().EOL;
             return false;
         }
     }
@@ -168,12 +171,12 @@ class PDO_SQL
     
     public static function table_delete($tableName): bool
     {
-        return (bool)self::run_exec("DROP TABLE IF EXISTS `$tableName`; ");
+        return self::run_exec("DROP TABLE IF EXISTS `$tableName`; ")!==false;
     }
     
     public static function table_rename($oldName, $newName): bool
     {
-        return (bool)self::run_exec("ALTER TABLE `$oldName` RENAME TO `$newName`;");
+        return self::run_exec("ALTER TABLE `$oldName` RENAME TO `$newName`;")!==false;
     }
     
     public static function table_describe($tableName): ?array
@@ -181,9 +184,18 @@ class PDO_SQL
         return self::run_query("DESCRIBE `$tableName`;")->data_to_array();
     }
     
-    public static function table_columns($tableName): ?array
+    public static function table_columns($tableName): array
     {
-        return self::run_query("SHOW COLUMNS FROM `$tableName`;")->data_to_array_num();
+        $stms = self::run_query("SHOW COLUMNS FROM `$tableName`;");
+        if (!$stms) return [];
+        return $stms->data_to_array();
+    }
+    
+    public static function table_indexes($tableName): array
+    {
+        $stmt = self::run_query("SHOW INDEX FROM `$tableName`;");
+        if (!$stmt) return [];
+        return $stmt->data_to_array();
     }
     
     ### SELECT methods
@@ -211,7 +223,7 @@ class PDO_SQL
         new self; if (!self::$connection) return null;
         try {
             $statement = self::run_query("SELECT MAX(ID) FROM `$table` ");
-            return (int) $statement->data_to_array_num()[0];
+            return (int) $statement->data_to_array_num()[0]['MAX(ID)'];
         } catch(PDOException $e) {
             self::$error .= 'We have ERROR in count MAX data!' .EOL;
             self::$error .= $e->getMessage() .EOL;
@@ -251,12 +263,14 @@ class PDO_SQL
     public static function search_where_no_buffer($query, $executes=[]): false|PDO_Fetch|null
     {
         new self(true); if (!self::$connectionNoBuffer) return null;
+        
         try {
+            $connectionID = self::$connectionNoBuffer->query("SELECT CONNECTION_ID()")->fetchColumn();
             $stmt = self::$connectionNoBuffer->prepare($query);
             $stmt->execute($executes);
             
             $fetch = new Pdo_Fetch($stmt);
-            $fetch->threadID_NoBuffer = self::$connectionNoBuffer->query("SELECT CONNECTION_ID()")->fetchColumn();
+            $fetch->threadID_NoBuffer = $connectionID;
             $fetch->stmt_NoBuffer = &$stmt;
             
             return $fetch;
