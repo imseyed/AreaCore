@@ -14,16 +14,23 @@ class Unique {}
 
 enum Type: string {
     case BOOL = 'boolean';
-    case VARCHAR = 'varchar';
-    case TEXT = 'text';
-    case MEDIUMTEXT = 'text';
-    case LONGTEXT = 'text';
-    case INT = 'bigint';
-    case INT_SIGNED = 'bigint';
+    case SMALLINT = 'smallint';
+    case INT = 'integer';
     case BIGINT = 'bigint';
-    case BIGINT_SIGNED = 'bigint';
+    case REAL = 'real';
     case FLOAT = 'double precision';
-    case DECIMAL = 'decimal';
+    case DECIMAL = 'numeric';
+    case VARCHAR = 'varchar';
+    case CHAR = 'char';
+    case TEXT = 'text';
+    case DATE = 'date';
+    case TIME = 'time';
+    case TIMESTAMP = 'timestamp';
+    case TIMESTAMPTZ = 'timestamptz';
+    case JSON = 'json';
+    case JSONB = 'jsonb';
+    case UUID = 'uuid';
+    case BYTEA = 'bytea';
 }
 
 #[Attribute(Attribute::TARGET_PROPERTY)]

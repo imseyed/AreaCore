@@ -32,9 +32,13 @@ class PostgreSQL_Data
         if ($final) {
             $query = $this->create_query();
             $countAlias = PDO_SQL::count_alias();
+            $stmt = PDO_SQL::search_where($query, $this->executes);
+            if (!$stmt) {
+                return $this->action === 'count' ? 0 : [];
+            }
             return match ($this->action) {
-                'select' => PDO_SQL::search_where($query, $this->executes)->data_to_array(),
-                'count' => (int)(PDO_SQL::search_where($query, $this->executes)->data_to_array()[0][$countAlias] ?? 0),
+                'select' => $stmt->data_to_array(),
+                'count' => (int)($stmt->data_to_array()[0][$countAlias] ?? 0),
                 default => null,
             };
         }
@@ -156,10 +160,13 @@ class PostgreSQL_Data
             }
         }
         
-        if (!$this->reverse) {
-            $query .= "ORDER BY $this->sort ";
-        } else {
-            $query .= "ORDER BY $this->sort DESC ";
+        if ($this->action !== 'count') {
+            $sortExpression = ($this->sort === "ID") ? $this->quote("ID") : $this->sort;
+            if (!$this->reverse) {
+                $query .= "ORDER BY $sortExpression ";
+            } else {
+                $query .= "ORDER BY $sortExpression DESC ";
+            }
         }
         
         if ($this->limit) {
@@ -373,7 +380,7 @@ class PostgreSQL_Data
                     $query = $this->create_query();
                     $this->statement = PDO_SQL::search_where($query, $this->executes);
                 }
-                if ($this->statement === null) {
+                if (!($this->statement instanceof PDO_Fetch)) {
                     return [];
                 }
                 return match ($this->action) {
@@ -386,7 +393,7 @@ class PostgreSQL_Data
                     $query = $this->create_query();
                     $this->statement = PDO_SQL::search_where_no_buffer($query, $this->executes);
                 }
-                if ($this->statement === null) {
+                if (!($this->statement instanceof PDO_Fetch)) {
                     return [];
                 }
                 return match ($this->action) {
@@ -397,15 +404,25 @@ class PostgreSQL_Data
             case "co":
                 $this->action = "count";
                 $query = $this->create_query();
-                $return = (int)(PDO_SQL::search_where($query, $this->executes)->data_to_array()[0][$countAlias] ?? 0);
+                $stmt = PDO_SQL::search_where($query, $this->executes);
+                if (!$stmt) {
+                    $this->action = "select";
+                    $this->executes = [];
+                    return 0;
+                }
+                $return = (int)($stmt->data_to_array()[0][$countAlias] ?? 0);
                 $this->action = "select";
                 $this->executes = [];
                 return $return;
             default:
                 $query = $this->create_query();
+                $stmt = PDO_SQL::search_where($query, $this->executes);
+                if (!$stmt) {
+                    return $this->action === 'count' ? 0 : [];
+                }
                 return match ($this->action) {
-                    'select' => PDO_SQL::search_where($query, $this->executes)->data_to_array(),
-                    'count' => (int)(PDO_SQL::search_where($query, $this->executes)->data_to_array()[0][$countAlias] ?? 0),
+                    'select' => $stmt->data_to_array(),
+                    'count' => (int)($stmt->data_to_array()[0][$countAlias] ?? 0),
                     default => [],
                 };
         }
@@ -415,7 +432,12 @@ class PostgreSQL_Data
     {
         if ($this->objectForSet) {
             $query = $this->create_query();
-            $data = PDO_SQL::search_where($query, $this->executes)->data_to_array();
+            $stmt = PDO_SQL::search_where($query, $this->executes);
+            if (!$stmt) {
+                $this->objectForSet->clear();
+                return false;
+            }
+            $data = $stmt->data_to_array();
             if (count($data) > 0) {
                 return $this->objectForSet->load($data[0]);
             }

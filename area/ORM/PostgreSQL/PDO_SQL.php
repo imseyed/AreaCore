@@ -376,6 +376,12 @@ class PDO_SQL
             return null;
         }
         
+        if (array_key_exists('ID', $vars)) {
+            if ($vars['ID'] === null || $vars['ID'] === '' || (is_numeric($vars['ID']) && (int)$vars['ID'] === 0)) {
+                unset($vars['ID']);
+            }
+        }
+        
         $columns = "";
         $values = "";
         $valuesArray = [];
@@ -390,8 +396,13 @@ class PDO_SQL
             self::$connection->beginTransaction();
             $qTable = self::quote($table);
             $qID = self::quote("ID");
-            $statement = self::$connection->prepare("INSERT INTO $qTable($columns) VALUES ($values) RETURNING $qID;");
-            $statement->execute($valuesArray);
+            if ($columns === "" || $values === "") {
+                $statement = self::$connection->prepare("INSERT INTO $qTable DEFAULT VALUES RETURNING $qID;");
+                $statement->execute();
+            } else {
+                $statement = self::$connection->prepare("INSERT INTO $qTable($columns) VALUES ($values) RETURNING $qID;");
+                $statement->execute($valuesArray);
+            }
             $insertedID = $statement->fetchColumn();
             self::$connection->commit();
             return (int)$insertedID;

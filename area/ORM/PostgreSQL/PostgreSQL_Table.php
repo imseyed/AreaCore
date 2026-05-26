@@ -299,24 +299,17 @@ class PostgreSQL_Table
     
     private function normalize_type_from_attribute(Type $type, ?string $maxLength): string
     {
-        return match ($type) {
-            Type::BOOL => 'BOOLEAN',
-            Type::VARCHAR => 'VARCHAR',
-            Type::TEXT, Type::MEDIUMTEXT, Type::LONGTEXT => 'TEXT',
-            Type::INT, Type::INT_SIGNED, Type::BIGINT, Type::BIGINT_SIGNED => 'BIGINT',
-            Type::FLOAT => 'DOUBLE PRECISION',
-            Type::DECIMAL => 'DECIMAL',
-        };
+        return strtoupper($type->value);
     }
     
     private function build_type_definition(string $columnType, ?string $maxLength): string
     {
         $upper = strtoupper($columnType);
-        if ($upper === 'VARCHAR' && $maxLength !== null) {
-            return "VARCHAR($maxLength)";
+        if (in_array($upper, ['VARCHAR', 'CHAR'], true) && $maxLength !== null) {
+            return "$upper($maxLength)";
         }
-        if ($upper === 'DECIMAL' && $maxLength !== null) {
-            return "DECIMAL($maxLength)";
+        if (in_array($upper, ['DECIMAL', 'NUMERIC'], true) && $maxLength !== null) {
+            return "$upper($maxLength)";
         }
         return $upper;
     }
