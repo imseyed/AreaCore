@@ -48,4 +48,4 @@ if ($uri){
         $uri = str_replace("//","/",$uri);
     $uri = explode("/", $uri);
 }else // CLI MODE
-    $uri = $argv;
+    $uri = $argv ?? [];

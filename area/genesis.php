@@ -2,7 +2,7 @@
 namespace AreaCore;
 
 const _ = null;
-const AreaCore = "v2.0.2";
+const AreaCore = "v2.1.0";
 
 if (php_sapi_name() == "cli"){ // CLI MODE
     define('EOL', PHP_EOL);
@@ -24,7 +24,7 @@ class Genesis
     static function init(): void
     {
         self::load_orm();
-        self::load_extensions();
+        self::load_extension();
         self::load_lib();
         self::load_model();
     }
@@ -40,9 +40,9 @@ class Genesis
         }
     }
     
-    static function load_extensions(): void
+    static function load_extension(): void
     {
-        $extensionsDir = __DIR__.'/extensions/';
+        $extensionsDir = __DIR__.'/extension/';
         if (is_dir($extensionsDir)) {
             foreach (glob($extensionsDir . '*.ext.php') as $extensionFile) {
                 // Use require_once to avoid double-including the same file
