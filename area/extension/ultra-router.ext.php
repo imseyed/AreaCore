@@ -172,20 +172,80 @@ class Router
     }
     
     ## Actions
-    public function page($fileAddress): void
+    public function page($fileAddress): Router
     {
         // Doesn't allow more than one action
         if (!$this->isMatch)
-            return;
+            return $this;
         if (!str_starts_with('/', $fileAddress)) {
             $fileAddress = "view/" . $fileAddress;
         }
         if (file_exists($fileAddress)) {
             include $fileAddress;
         }elseif (file_exists("$fileAddress.php")) {
-            include "$fileAddress.php";
+            include "ultra-router.ext.php";
+        }else{ // Not found
+            die("Could not load page file");
         }
+        self::$RUN_ACTION = true;
+        return $this;
     }
     
+    public function call(callable $callback): Router
+    {
+        if (!$this->isMatch)
+            return $this;
+        
+        self::$RUN_ACTION = true;
+        
+        // CASE 1: string "Class::method"
+        if (is_string($callback) && str_contains($callback, '::')) {
+            
+            [$class, $method] = explode('::', $callback);
+            
+            $ref = new ReflectionMethod($class, $method);
+            $params = $this->resolveParams($ref);
+            
+            $ref->invoke(null, ...$params);
+            return $this;
+        }
+        
+        // CASE 2: closure or function
+        if (is_string($callback) || $callback instanceof Closure) {
+            
+            $ref = new ReflectionFunction($callback);
+            $params = $this->resolveParams($ref);
+            
+            $ref->invokeArgs($params);
+            return $this;
+        }
+        
+        // CASE 3: [object, method]
+        if (is_array($callback)) {
+            
+            $ref = new ReflectionMethod($callback[0], $callback[1]);
+            $params = $this->resolveParams($ref);
+            
+            $ref->invokeArgs($callback[0], $params);
+            return $this;
+        }
+        
+        // fallback
+        $callback(self::$var);
+        
+        return $this;
+    }
     
+    private function resolveParams($ref): array
+    {
+        $params = [];
+        
+        foreach ($ref->getParameters() as $param) {
+            $name = $param->getName();
+            
+            $params[] = self::$var[$name] ?? null;
+        }
+        
+        return $params;
+    }
 }
