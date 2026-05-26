@@ -7,7 +7,8 @@ class Router
     public static ?array $var = [];
     public static bool $ALLOW_MULTIPLE = false;
     public static bool $RUN_ACTION = false;
-    private static ?array $uri = null;
+    public static array $uri = [];
+    private array $tempVar = [];
     private bool $isMatch = true;
     
     ## Define named routes
@@ -15,43 +16,44 @@ class Router
     static function define($name, $routeUri): void
     {
         self::$definition[$name] = $routeUri;
+        self::requested_uri();
     }
     
     ## Supported methods
     
-    static function any($uri)
+    static function any($uri): Router
     {
         return self::build('any', $uri);
     }
     
-    static function cli($uri)
+    static function cli($uri): Router
+    {
+        return self::build('cli', $uri);
+    }
+    
+    static function get($uri): Router
     {
         return self::build('any', $uri);
     }
     
-    static function get($uri)
+    static function post($uri): Router
     {
-        return self::build('any', $uri);
+        return self::build('post', $uri);
     }
     
-    static function post($uri)
+    static function delete($uri): Router
     {
-        return self::build('any', $uri);
+        return self::build('delete', $uri);
     }
     
-    static function delete($uri)
+    static function put($uri): Router
     {
-        return self::build('any', $uri);
+        return self::build('put', $uri);
     }
     
-    static function put($uri)
+    static function patch($uri): Router
     {
-        return self::build('any', $uri);
-    }
-    
-    static function patch($uri)
-    {
-        return self::build('any', $uri);
+        return self::build('patch', $uri);
     }
     
     private static function build(string $method, $uri): self
@@ -65,18 +67,19 @@ class Router
         }
         
         $item->method = $method;
-        $item->requested_uri();
+        self::requested_uri();
         $item->is_match($uri);
         $item->query_parameter($uri);
         return $item;
     }
     
     ## variables
-    private function requested_uri()
+    private static function requested_uri()
     {
-        if (!is_null(self::$uri))
+        // var_dump($argv);
+        if (self::$uri)
             return;
-        $uri = @$_SERVER['REQUEST_URI'];
+        $uri = $_SERVER['REQUEST_URI'] ?? "";
         if ($uri){
             $uri = urldecode($uri);
             $uri = substr($uri, mb_strlen(base));
@@ -86,7 +89,7 @@ class Router
                 $uri = str_replace("//","/",$uri);
             $uri = explode("/", $uri);
         }else // CLI MODE
-            $uri = $argv ?? [];
+            $uri = $_SERVER["argv"] ?? [];
         self::$uri = $uri;
     }
     
@@ -96,7 +99,8 @@ class Router
             // $matches[0] equal `[foo]`
             // $matches[1] equal `foo`
             $key = $matches[1];
-            
+            if (in_array($matches[1], ['+', '*']))
+                return $matches[0];
             // Chek if defined
             if (isset(self::$definition[$key]))
                 return self::$definition[$key];;
@@ -106,12 +110,14 @@ class Router
         }, $pattern);
     }
     
-    private function is_match($pattern)
+    private function is_match($pattern): bool
     {
         $pattern = $this->resolve_definition($pattern);
         // Ignore GET parameters on pattern, Actually, we'll check it out later
         $pattern = substr($pattern, 0, strpos($pattern, '?')?:strlen($pattern));
         $pattern = explode("/", $pattern);
+        
+        $hasWildcard = false;
         
         foreach ($pattern as $key=>$item){
             $equivalent = @self::$uri[$key]; // Equivalent matched part in requested URI
@@ -122,7 +128,11 @@ class Router
             // Patter using variables {bar}
             if (str_starts_with($item, "{") && str_ends_with($item, "}")){
                 $this->append_var($item, $equivalent);
-            }elseif ($item != $equivalent){
+            }elseif ($item == "[+]")
+                continue;
+            elseif ($item == "[*]"){
+                $hasWildcard = true;
+            } elseif ($item != $equivalent && !$hasWildcard){
                 $this->isMatch = false;
                 return false;
             }
@@ -132,6 +142,9 @@ class Router
     
     private function query_parameter($pattern)
     {
+        if (!$this->isMatch)
+            return;
+        
         $parse = parse_url($pattern);
         if (isset($parse['query'])){
             parse_str($parse['query'], $query);
@@ -150,7 +163,7 @@ class Router
         $parts = explode(".", $item);
         
         // reference to root
-        $current = &self::$var;
+        $current = &$this->tempVar;
         
         // ساخت لایه‌های میانی
         while (count($parts) > 1) {
@@ -175,8 +188,9 @@ class Router
     public function page($fileAddress): Router
     {
         // Doesn't allow more than one action
-        if (!$this->isMatch)
+        if (!$this->check_conditions())
             return $this;
+        
         if (!str_starts_with('/', $fileAddress)) {
             $fileAddress = "view/" . $fileAddress;
         }
@@ -193,7 +207,7 @@ class Router
     
     public function call(callable $callback): Router
     {
-        if (!$this->isMatch)
+        if (!$this->check_conditions())
             return $this;
         
         self::$RUN_ACTION = true;
@@ -204,7 +218,7 @@ class Router
             [$class, $method] = explode('::', $callback);
             
             $ref = new ReflectionMethod($class, $method);
-            $params = $this->resolveParams($ref);
+            $params = $this->resolve_params($ref);
             
             $ref->invoke(null, ...$params);
             return $this;
@@ -214,7 +228,7 @@ class Router
         if (is_string($callback) || $callback instanceof Closure) {
             
             $ref = new ReflectionFunction($callback);
-            $params = $this->resolveParams($ref);
+            $params = $this->resolve_params($ref);
             
             $ref->invokeArgs($params);
             return $this;
@@ -224,7 +238,7 @@ class Router
         if (is_array($callback)) {
             
             $ref = new ReflectionMethod($callback[0], $callback[1]);
-            $params = $this->resolveParams($ref);
+            $params = $this->resolve_params($ref);
             
             $ref->invokeArgs($callback[0], $params);
             return $this;
@@ -236,7 +250,7 @@ class Router
         return $this;
     }
     
-    private function resolveParams($ref): array
+    private function resolve_params($ref): array
     {
         $params = [];
         
@@ -247,5 +261,23 @@ class Router
         }
         
         return $params;
+    }
+    
+    private function check_conditions(): bool
+    {
+        $inCondition = true;
+        if (!$this->isMatch)
+            $inCondition = false;
+        if (!in_array($this->method, ['any', 'cli']) && $this->method != strtolower($_SERVER['REQUEST_METHOD']))
+            $inCondition = false;
+        if ($this->method == 'cli' && php_sapi_name() != 'cli')
+            $inCondition = false;
+        
+        if (!$inCondition){
+            self::$var = [];
+            return false;
+        }
+        self::$var = $this->tempVar;
+        return true;
     }
 }

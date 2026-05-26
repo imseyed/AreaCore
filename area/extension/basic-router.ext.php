@@ -34,6 +34,8 @@ function set_cookie($name, $value, $expire = 0, $path = (base?:"/"), $domain=sit
     return setcookie($name, $value, $cookieOptions);
 }
 
+global $get, $post, $uri;
+
 $get = $_GET;
 $post = $_POST;
 
@@ -48,4 +50,4 @@ if ($uri){
         $uri = str_replace("//","/",$uri);
     $uri = explode("/", $uri);
 }else // CLI MODE
-    $uri = $argv ?? [];
+    $uri = $_SERVER["argv"] ?? [];
