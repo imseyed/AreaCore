@@ -1,95 +1,136 @@
-# Area Core
 
-A PHP Framework for Web & CLI Application Development.
+# Areacore
 
-## AMR Architecture
+> A lightweight, extensible PHP framework for both web applications and CLI services.
 
-This project uses the AMR architecture pattern. AMR stands for:
+[![PHP](https://img.shields.io/badge/PHP-8.1%2B-blue?logo=php)](https://php.net)
+[![License](https://img.shields.io/github/license/imseyed/AreaCore)](https://github.com/imseyed/AreaCore/blob/main/LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/imseyed/AreaCore)](https://github.com/imseyed/AreaCore)
 
-- A = Action
-- M = Model
-- R = Responder
+---
 
-Overview
---------
+## ✨ Features
 
-AMR is a small, pragmatic pattern that clarifies responsibilities in request handling by separating orchestration (Action), business logic and data (Model), and presentation/response formatting (Responder). It is especially useful for applications that must expose the same use cases across multiple interfaces (HTTP controllers, APIs, CLI commands, background jobs).
+- **Lightweight** — Minimal footprint, no unnecessary overhead
+- **Optimized** — Built for performance from the ground up
+- **Small Size** — Tiny codebase, easy to understand and audit
+- **Web & CLI Support** — First-class support for HTTP applications *and* background services/scripts
+- **Flexible** — Works with MVC, ADR, or any custom structure you prefer
 
-Roles
------
+---
 
-- Action: receives an input (for example an HTTP request or CLI arguments), performs request-level concerns (authentication, authorization, input validation, and orchestration), invokes one or more Models to perform business logic, and selects or prepares a Responder.
+## 📦 Installation
 
-- Model: encapsulates business rules, domain logic and data access. Models should be framework-agnostic where possible — they return plain data or domain objects and do not know about HTTP or presentation details.
+Clone directly from GitHub:
 
-- Responder: formats the final output for the target interface. For web requests this might produce an HTTP response, headers and a view/template or JSON. For CLI it may print formatted text. The Responder keeps presentation concerns out of Actions and Models.
+```bash
+git clone https://github.com/imseyed/AreaCore.git
+cd AreaCore
+```
 
-Typical request flow
---------------------
+---
 
-1. A transport adapter (router, controller, CLI runner) routes the request to an Action.
-2. The Action validates input and invokes Models to execute business logic.
-3. The Models return data or domain objects to the Action.
-4. The Action passes data to a Responder, which builds the final response (HTTP response, JSON body, plain text, etc.).
-5. The transport sends the Responder's output back to the client.
+## 🏗️ Architecture:  Action-Based Architecture (ABA)
 
-Benefits
---------
+Areacore uses an **Action-Based Architecture**, where every route maps directly to an *action* — a file, a method, a function, or an inline closure. This keeps the flow explicit and traceable.
 
-- Strong separation of concerns: orchestration, business logic and presentation are distinct.
-- Easy to test: Actions can be tested by mocking Models and Responders; Models can be tested in isolation.
-- Flexible outputs: the same Action/Model combination can be paired with different Responders to support APIs, HTML pages and CLI without duplicating business logic.
-- Predictable flow: developers quickly understand where to add validation, business rules or formatting.
+### Request Lifecycle
 
-Implementation tips
--------------------
 
-- Keep Actions thin: they should not contain heavy business logic. Instead, call Model services or domain objects.
-- Keep Models free of transport concerns: avoid returning HTTP codes from Models; return domain results or exceptions.
-- Keep Responders responsible only for presentation: building HTTP responses, serializing JSON, or rendering templates.
-- Use small value objects or plain arrays for data transfer between layers to make unit testing easier.
+Client
 
-Small PHP pseudo-example
-------------------------
+    └─▶ index.php
+        └─▶ Router
+              ├─▶ File (e.g. blog/blog-show.php)
+              ├─▶ Static method (e.g. Blog::show())
+              ├─▶ Controller method (e.g. Controller::blog_show())
+              ├─▶ Object method (e.g. [$blog, 'show'])
+              └─▶ Inline closure (function() { ... })
+
+### Routing Examples
+
+php
 ```php
-Action (orchestrates request)
-class CreateUserAction {
-	public function __construct(UserModel $model, CreateUserResponder $responder) {}
+// Route to a file
+Router::get("[blogPost]/{blog.post.ID}/add/{title}")
+    ->page("blog/blog-show.php");
 
-	public function __invoke(array $input) {
-		$validated = $this->validate($input);
-		$user = $this->model->create($validated);
-		return $this->responder->respond($user);
-	}
-}
+// Route to a static method
+Router::get("[blogPost]/{blog.post.ID}/add/{title}")
+    ->call('Blog::show_blog');
 
-// Model (business logic & data)
-class UserModel {
-	public function create(array $data) { /* persist and return domain object */ }
-}
+// Route to an object method
+Router::get("[blogPost]/{blog.post.ID}/add/{title}")
+    ->call([$blog, 'show_blog_obj']);
 
-// Responder (presentation)
-class CreateUserResponder {
-	public function respond($user) { /* return HTTP response or CLI output */ }
+// Route to an inline closure
+Router::get("[blogPost]/{blog.post.ID}/add/{title}")
+    ->call(function () {
+        echo time();
+    });
+
+```
+---
+
+### Flexibility: MVC vs ADR
+
+The same routing system supports both patterns — choose what fits your project.
+
+#### MVC Pattern
+
+```php
+// Controller handles the request, Model fetches data, View renders output
+Router::get('/blog/{id}')->call('BlogController::show');
+
+// BlogController.php
+class BlogController {
+    public static function show(int $id): void {
+        $post = Blog::find($id);       // Model
+        View::render('blog/show', $post); // View
+    }
 }
 ```
 
+#### ADR Pattern (Action–Domain–Responder)
 
-AMR vs MVC
-----------
+```php
+// Each action is a single-responsibility class or file
+Router::get('/blog/{id}')->page('actions/blog/Show-blog-action.php');
 
-AMR focuses on a single-use-case flow: Action (use case orchestration), Model (domain logic) and Responder (presentation). MVC splits responsibilities differently and often mixes view rendering inside controllers; AMR makes the use-case explicit and encourages reusable Models and interchangeable Responders.
+// Show-blog-action.php
+$post = new Blog($id);      // Domain
+BlogResponder::respond($post);    // Responder
+```
 
-When to use
------------
+> Both patterns are fully supported. You can even mix them per route.
 
-AMR is a good fit for applications that need clear, testable use-case boundaries and multiple output formats. It's also helpful when you want to keep controllers thin and avoid mixing presentation with business logic.
+---
 
-Further reading & notes
-----------------------
+## 📋 Requirements
 
-This README is a short overview. Keep Actions, Models and Responders small and focused. Prefer composition over inheritance and write unit tests for each component in isolation.
+| Requirement | Version   |
+|-------------|-----------|
+| PHP         | `>= 8.1`  |
+| PDO         | `Enabled` |
 
+No additional dependencies required.
 
+> **Note:** Areacore is designed to run in both **web server environments** (Apache, Nginx, Caddy, PHP built-in server) and **CLI environments** — including cron jobs, queue workers, daemons, and background service scripts.
 
+---
 
+## 📚 Documentation
+
+| Document                                         | Description                            |
+|--------------------------------------------------|----------------------------------------|
+| [Project Structure](docs/framework/structure.md) | Directory layout and file organization |
+| [Router](docs/framework/router.md)               | Full routing API reference             |
+| [ORM](docs/framework/orm.md)                     | Database layer and model usage         |
+| [Quick Start](docs/framework/quick-start.md)     | Step-by-step getting started guide     |
+| [Contributing](docs/framework/contribute.md)     | How to contribute to Areacore          |
+
+---
+
+## 📄 License
+
+The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).

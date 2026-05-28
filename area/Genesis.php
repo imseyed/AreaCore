@@ -10,7 +10,6 @@ if (php_sapi_name() == "cli"){ // CLI MODE
 } else{ // Web MODE
     define('EOL', '<br>');
     define("protocol", (@$_SERVER['REQUEST_SCHEME']?:strtolower(explode('/', $_SERVER['SERVER_PROTOCOL'])[0]))."://");
-    
 }
 
 if (version_compare(PHP_VERSION, '8.1', '<')) {
