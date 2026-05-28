@@ -3,9 +3,12 @@
 
 > A lightweight, extensible PHP framework for both web applications and CLI services.
 
+
+[![PHP](https://img.shields.io/badge/PHP%20Framework:-Area%20Core-blue?logo=php&color=4f5b93)](https://php.net)
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-blue?logo=php)](https://php.net)
-[![License](https://img.shields.io/github/license/imseyed/AreaCore)](https://github.com/imseyed/AreaCore/blob/main/LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/imseyed/AreaCore)](https://github.com/imseyed/AreaCore)
+![Last Commit](https://img.shields.io/github/last-commit/imseyed/AreaCore?style=flat-square)
+![Visitors](https://visitor-badge.laobi.icu/badge?page_id=imseyed.AreaCore?color=red)
+![GitHub stars](https://img.shields.io/github/stars/imseyed/AreaCore?style=flat-square&color=yellow)
 
 ---
 
