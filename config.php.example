@@ -1,0 +1,36 @@
+<?php
+### Basic config.php example
+const siteAddress = "example.com";
+const base = "/AreaCore";
+const siteVersion = "v1.2.3";
+const developMode =  1;
+
+$DB_Config = array(
+    'mode'=>'mysql',
+    'hostname'=>'localhost',
+    'port'=>'3306',
+    'username'=>'root',
+    'password'=>'',
+    'dbname'=>'areacore'
+);
+
+ini_set("memory_limit", "2048M");
+ini_set("post_max_size", "1024M");
+ini_set("upload_max_filesize", "1024M");
+
+
+### If you want set automatically across file name, Use bellow in Apache
+/*
+if (!defined('base')){
+    define('base', str_replace('/index.php', '', $_SERVER['SCRIPT_NAME']));
+}
+if (!defined('siteAddress')){
+    define('siteAddress', (@$_SERVER['HTTP_X_FORWARDED_HOST']?:@$_SERVER['HTTP_HOST']).base);
+}
+*/
+
+### If you are using docker or caddy and want to configuration from .ENV
+/*
+define('base', getenv('APP_BASE'));
+define('siteAddress', getenv('SITE_ADDRESS'));
+*/
