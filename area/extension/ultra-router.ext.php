@@ -132,7 +132,7 @@ class Router
                 continue;
             elseif ($item == "[*]"){
                 $hasWildcard = true;
-            } elseif ($item != $equivalent && !$hasWildcard){
+            } elseif (strcasecmp($item, $equivalent) !== 0 && !$hasWildcard){
                 $this->isMatch = false;
                 return false;
             }
