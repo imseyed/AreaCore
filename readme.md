@@ -121,13 +121,14 @@ No additional dependencies required.
 
 ## 📚 Documentation
 
-| Document                                         | Description                            |
-|--------------------------------------------------|----------------------------------------|
-| [Project Structure](docs/framework/structure.md) | Directory layout and file organization |
-| [Router](docs/framework/router.md)               | Full routing API reference             |
-| [ORM](docs/framework/orm.md)                     | Database layer and model usage         |
-| [Quick Start](docs/framework/quick-start.md)     | Step-by-step getting started guide     |
-| [Contributing](docs/framework/contribute.md)     | How to contribute to Areacore          |
+| Document                                             | Description                            |
+|------------------------------------------------------|----------------------------------------|
+| [Project Structure](docs/framework/structure.md)     | Directory layout and file organization |
+| [Router](docs/framework/router.md)                   | Full routing API reference             |
+| [ORM](docs/framework/orm.md)                         | Database layer and model usage         |
+| [Quick Start](docs/framework/quick-start.md)         | Step-by-step getting started guide     |
+| [Contributing](docs/framework/contribute.md)         | How to contribute to Areacore          |
+| [Web Server Deployment](docs/framework/webserver.md) | How to deploy using any web server     |
 
 ---
 

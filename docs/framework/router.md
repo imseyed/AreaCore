@@ -1,7 +1,3 @@
-حتماً — این نسخه‌ی اصلاح‌شده و دقیق **Router.md** هست، با رعایت تمام نکاتی که گفتی و بدون اشتباهات قبلی:
-
----
-
 # 🌐 Router System
 
 The AreaCore framework includes two routing engines:
