@@ -3,7 +3,7 @@
 class Router
 {
     private ?string $method = "";
-    private static ?array $definition = [];
+    private static ?array $def = [];
     public static ?array $var = [];
     public static bool $ALLOW_MULTIPLE = false;
     public static bool $RUN_ACTION = false;
@@ -15,8 +15,13 @@ class Router
     
     static function define($name, $routeUri): void
     {
-        self::$definition[$name] = $routeUri;
+        self::$def[$name] = $routeUri;
         self::requested_uri();
+    }
+    
+    static function prefix($name): string
+    {
+        return self::$def[$name];
     }
     
     ## Supported methods
@@ -102,8 +107,8 @@ class Router
             if (in_array($matches[1], ['+', '*']))
                 return $matches[0];
             // Chek if defined
-            if (isset(self::$definition[$key]))
-                return self::$definition[$key];;
+            if (isset(self::$def[$key]))
+                return self::$def[$key];;
             
             // Return without change if not defined
             return $matches[0];
@@ -197,9 +202,13 @@ class Router
         if (file_exists($fileAddress)) {
             include $fileAddress;
         }elseif (file_exists("$fileAddress.php")) {
-            include "ultra-router.ext.php";
+            include "$fileAddress.php";
         }else{ // Not found
-            die("Could not load page file");
+            if (function_exists('router_file_not_found')) {
+                router_file_not_found();
+                return $this;
+            }else
+                die("Could not load page file");
         }
         self::$RUN_ACTION = true;
         return $this;

@@ -7,171 +7,249 @@ The AreaCore framework includes two routing engines:
 
 Both systems can be used depending on project complexity, but Ultra Router is the recommended modern approach.
 
----
 
-# ⚡ Ultra Router
+## ⚡ Ultra Router – Documentation
 
-The Ultra Router is a high-performance, pattern-based routing engine with:
+The Ultra Router is a high-performance, pattern-based routing engine for modern PHP applications. It supports dynamic parameters, nested variable mapping, wildcard segments, multi-handler execution, and a flexible response system.
 
-* Named routes
-* Dynamic parameters
-* Nested variable mapping
-* Wildcard segments (`[+]`, `[*]`)
-* Query binding
-* Multi-handler execution
-* Flexible response system (page + callbacks)
 
 ---
 
-# 🧠 Request URI Structure
-
-The current request path is available in:
+### Pattern: Route + Method + Address + Action
 
 ```php
-Router::$uri
+Router::method('/address')->action();
 ```
 
-It is always an indexed array.
-
-### 📌 Example (Web Request)
-
-Request:
-
-```text
-/user/blog/12/add/title
-```
-
-Becomes:
+#### Example:
 
 ```php
-[0] => ""
-[1] => "user"
-[2] => "blog"
-[3] => "12"
-[4] => "add"
-[5] => "title"
+Router::get('/user/profile')->page("blog/show");
+```
+
+Or with static controller method:
+
+```php
+Router::post('/user/save', 'UserController::save');
 ```
 
 ---
 
-### 📌 Important Notes
+### Supported Method Types
 
-* `index 0` is always empty in **web mode**
-* In **CLI mode**, index `0` represents the script name (e.g. `index.php`)
-* All values are automatically normalized to **lowercase**
-
----
-
-# 🔁 Case Sensitivity Rule
-
-Routing comparisons are **case-insensitive**.
-
-Internally, comparisons are handled using:
-
-```php
-strcasecmp()
-```
-
-This means:
-
-```text
-/Blog/Post
-/blog/post
-/BLOG/POST
-```
-
-are all treated as identical routes.
+| Method   | Description             |
+|----------|-------------------------|
+| `any`    | Matches any HTTP method |
+| `get`    | GET request             |
+| `post`   | POST request            |
+| `put`    | PUT request             |
+| `patch`  | PATCH request           |
+| `delete` | DELETE request          |
+| `cli`    | CLI execution only      |
 
 ---
 
-# 📦 Route Variables
+### Variable Mapping System
 
-All extracted dynamic values are stored in:
+#### Defining Variables in URI
 
-```php
-Router::$var
-```
-
-### Example Mapping
-
-For route:
-
-```text
-/user/blog/12/add/title
-```
-
-You may get:
+To define dynamic variables in your route, use curly braces `{}` with dot notation for nested structures:
 
 ```php
-[
-  "blog" => [
-    "post" => [
-      "ID" => 12,
-      "type" => "news"
+Router::get('/user/{profile.name}/post/{post.id}')
+```
+
+#### How Variables Are Mapped
+
+When a route matches, variables are available in two ways:
+
+**1. Automatically injected into the called function**
+
+```php
+Router::get('/user/{name}/post/{id}', function($name, $id) {
+    // $name and $id are automatically passed
+    echo "User: $name, Post ID: $id";
+});
+```
+
+**2. Stored in `Router::$var` array**
+
+All variables are also available globally via `Router::$var` with nested structure:
+
+```php
+Router::get('/user/{profile.name}/post/{post.id}')
+
+
+// For route: /user/john/post/42
+Router::$var = [
+    'profile' => [
+        'name' => 'john'
+    ],
+    'post' => [
+        'id' => 42
     ]
-  ],
-  "title" => "hello-world"
+];
+```
+
+#### Using Variables in both URI & Query Parameters
+
+```php
+// Route definition
+Router::get('/blog/{category.name}/article/{article.ID}?type={type}', function($category, $article, $type) {
+    echo "Category: {$category['name']}<br>";
+    echo "Article ID: {$article['ID']}<br>";
+    echo "Type: $type<br>";
+    
+    // Also accessible via Router::$var
+    print_r(Router::$var);
+});
+
+// Request URL: /blog/technology/article/123?type=premium
+
+// Router::$var will contain:
+[
+    'category' => [
+        'name' => 'technology'
+    ],
+    'article' => [
+        'ID' => 123
+    ],
+    'type' => 'premium'  // from query parameter
 ]
 ```
 
 ---
 
-# 🔄 Multiple Route Execution
+### Addressing & Wildcards
 
-By default, only the first matching route executes.
+The router supports two powerful wildcards:
 
-To enable multiple route execution:
+| Wildcard | Description                                                |
+|----------|------------------------------------------------------------|
+| `[+]`    | Skips **exactly one** URI segment (but continues matching) |
+| `[*]`    | Captures **all remaining** URI segments (deep wildcard)    |
+
+#### Web Examples:
 
 ```php
-Router::$ALLOW_MULTIPLE = true;
+// Skips one segment (e.g., /user/admin/profile)
+Router::get('/user/[+]/profile')->page('profile.php');
+
+// Captures everything after /user/blog/
+Router::get('/user/blog/[*]/edit')->call('BlogController::edit');
 ```
 
-This allows multiple matching routes to run for a single request.
+> ✅ Variables after `[*]` are still parsed and assigned normally.
+
+#### CLI Examples:
+
+```php
+Router::get('/cron/backup')->page('cron/db/backup');
+
+// That call when un bellow command:
+// >$php index.php cron backup  
+```
+
+> ✅ Variables after `[*]` are still parsed and assigned normally.
+
 
 ---
 
-# 🧭 Supported HTTP / CLI Methods
+### 4. Defining Constants & Using `Router::prefix()`
 
-The router supports multiple request types:
+You can define reusable constants for use in routes and views.
 
-| Method   | Description             |
-| -------- | ----------------------- |
-| `any`    | Matches any HTTP method |
-| `get`    | GET requests            |
-| `post`   | POST requests           |
-| `put`    | PUT requests            |
-| `patch`  | PATCH requests          |
-| `delete` | DELETE requests         |
-| `cli`    | CLI execution only      |
+```php
+Router::define('adminBase', '/admin/dashboard');
+```
+
+#### Usage in route definition:
+
+```php
+Router::get('[adminBase]/settings')->page('admin/settings.php');
+```
+
+#### Usage in views / HTML:
+
+```php
+<a href="<?=Router::prefix('adminBase')?>/user/manager">Manage Users</a>
+```
+
+The `Router::prefix()` method returns the constant value for use in links.
 
 ---
 
-### 📌 Usage Example
+### 5. Types of Actions
+
+| Action     | Description                                                    |
+|------------|----------------------------------------------------------------|
+| `->page()` | Loads a view file from the `view/` directory                   |
+| `->call()` | Executes a static controller method, object method, or closure |
+| Chaining   | Multiple actions can be executed in sequence                   |
+
+#### Examples:
+
+**run a file:**
 
 ```php
-Router::get('/user/profile')->page('user/profile.php');
-Router::post('/user/save')->call('User::save');
+Router::get('/blog/{id}')->page('blog/blog-show.php');
+```
+
+> * files run using `include()` from folder `/view`. if you want to call from another root directory you can use `../anotherFolder`
+> * Write files extension are optional when is `.php`
+> * if action file not found, that close process and return string status. if you want to show specific error message must define function `router_file_not_found` 
+
+
+**Static method:**
+
+```php
+Router::get('/blog/{id}')->call('Blog::show');
+```
+
+**Object method:**
+
+```php
+Router::get('/blog/{id}')->call([$blog, 'show']);
+```
+
+**Closure:**
+
+```php
+Router::get('/time')->call(function() {
+    echo time();
+});
+```
+
+**Chaining:**
+
+```php
+Router::get('/blog/{id}')
+    ->page('blog/show.php')
+    ->call('Blog::show')
+    ->call([$blog, 'logVisit']);
 ```
 
 ---
 
-# 🏷️ Named Routes
+### 6. Automatic Variable Injection
 
-Named routes allow reusable path definitions.
+Variables defined in the route path are automatically passed to the called function — **without requiring type hints**.
 
-```php
-Router::define('blogPost', '/user/blog');
-```
+The router detects the parameter name and passes the value automatically.
 
-Usage:
+#### Example:
 
 ```php
-Router::get('[blogPost]/12');
+Router::get('/user/{name}/post/{postId}', function($name, $postId) {
+    echo "User: $name, Post ID: $postId";
+});
 ```
+
+Even if the function doesn't declare the parameter, no error occurs — the router only injects if the parameter exists.
 
 ---
 
-# 🛣️ Route Definition
+Let me know if you need any further adjustments.
 
 ## 📌 Basic Route
 
@@ -302,7 +380,7 @@ Router::get('/time')
 
 ---
 
-# 🔄 Execution Chain
+## 🔄 Execution Chain
 
 You can chain multiple actions:
 
@@ -323,49 +401,6 @@ Execution order:
 3. Object method
 4. Closure
 
----
-
-# 🧬 Variable Mapping System
-
-Dynamic variables:
-
-```text
-{blog.post.ID}
-```
-
-Becomes:
-
-```php
-Router::$var['blog']['post']['ID']
-```
-
----
-
-# 🔍 Query Parameters
-
-Query strings are automatically parsed:
-
-```text
-?type={blog.post.type}
-```
-
-Mapped into:
-
-```php
-Router::$var['blog']['post']['type']
-```
-
----
-
-# 🧠 Internal Flow
-
-1. Load URI → `Router::$uri`
-2. Normalize path
-3. Match route pattern
-4. Extract variables
-5. Bind query parameters
-6. Check method constraints
-7. Execute actions
 
 ---
 
