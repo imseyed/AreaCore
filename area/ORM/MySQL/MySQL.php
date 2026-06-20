@@ -45,7 +45,7 @@ trait MySQL
         }
         
         return $vars;
-       // return ((new ReflectionObject($this))->getProperties(ReflectionProperty::IS_PUBLIC));
+        // return ((new ReflectionObject($this))->getProperties(ReflectionProperty::IS_PUBLIC));
     }
     
     static function properties():array
@@ -73,7 +73,7 @@ trait MySQL
             $array = (array)$array;
         if (!is_array($array))
             return false;
-        $properties = array_keys($this->get_vars());
+        $properties = array_keys($this->get_vars(true, false));
         foreach ($array as $item=>$value){
             if (in_array($item, $properties))
                 @$this->{$item}=$value;

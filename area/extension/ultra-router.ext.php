@@ -328,6 +328,8 @@ class Router
             $inCondition = false;
         if (!in_array($this->method, ['any', 'cli']) && self::$requestMethod!="CLI" && $this->method != strtolower(self::$requestMethod))
             $inCondition = false;
+        if ($this->method == "any" && self::$requestMethod=="OPTIONS")
+            $inCondition = false;
         if ($this->method == 'cli' && php_sapi_name() != 'cli')
             $inCondition = false;
         

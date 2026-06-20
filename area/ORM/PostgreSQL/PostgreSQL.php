@@ -20,11 +20,21 @@ trait PostgreSQL
         
         if ($hasColumn) {
             $reflection = new ReflectionClass(get_class($this));
-            foreach ($vars as $key => $value) {
+            foreach ($vars as $key => &$value) {
                 if ($reflection->hasProperty($key)) {
                     $prop = $reflection->getProperty($key);
                     if (!empty($prop->getAttributes(NoColumn::class))) {
                         unset($vars[$key]);
+                    }
+                }
+                
+                // In Postgre boolean columns must save as t or f
+                if (is_bool($value)) {
+                    if ($reflection->hasProperty($key)) {
+                        $prop = $reflection->getProperty($key);
+                        $type = $prop->getType();
+                        if ($type && $type->getName() == "bool")
+                            $value = ($value ? "t" : "f");
                     }
                 }
             }
@@ -58,7 +68,7 @@ trait PostgreSQL
         if (!is_array($array)) {
             return false;
         }
-        $properties = array_keys($this->get_vars());
+        $properties = array_keys($this->get_vars(true, false));
         foreach ($array as $item => $value) {
             if (in_array($item, $properties, true)) {
                 @$this->{$item} = $value;
