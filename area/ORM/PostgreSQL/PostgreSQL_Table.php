@@ -78,7 +78,7 @@ class PostgreSQL_Table
         $tableName = $this->table;
         $vars = $this->properties;
         
-        $query = '';
+        $query = 'CREATE EXTENSION IF NOT EXISTS citext; ';
         if ($replace) {
             $query .= "DROP TABLE IF EXISTS " . $this->quote($tableName) . "; ";
         }
@@ -93,12 +93,12 @@ class PostgreSQL_Table
             }
             
             $isUnique = false;
-            $columnType = 'TEXT';
+            $columnType = 'CITEXT';
             $maxLength = null;
-            
+
             if ($reflection->hasProperty($var)) {
                 $prop = $reflection->getProperty($var);
-                
+
                 $lengthAttributes = $prop->getAttributes(Length::class);
                 if (!empty($lengthAttributes)) {
                     /** @var Length $length */
@@ -147,13 +147,13 @@ class PostgreSQL_Table
                 continue;
             }
             
-            $columnType = 'TEXT';
+            $columnType = 'CITEXT';
             $maxLength = null;
             $isUnique = false;
-            
+
             if ($reflection->hasProperty($var)) {
                 $prop = $reflection->getProperty($var);
-                
+
                 $lengthAttrs = $prop->getAttributes(Length::class);
                 if ($lengthAttrs) {
                     $length = $lengthAttrs[0]->newInstance();
@@ -209,7 +209,7 @@ class PostgreSQL_Table
             return null;
         }
         
-        return "ALTER TABLE " . $this->quote($tableName) . " " . implode(", ", $alterStatements) . ";";
+        return "CREATE EXTENSION IF NOT EXISTS citext; ALTER TABLE " . $this->quote($tableName) . " " . implode(", ", $alterStatements) . ";";
     }
     
     private function index_definition_query(): string
@@ -292,13 +292,17 @@ class PostgreSQL_Table
             'int' => 'BIGINT',
             'float' => 'DOUBLE PRECISION',
             'bool' => 'BOOLEAN',
-            'string' => 'TEXT',
-            default => 'TEXT',
+            'string' => 'CITEXT',
+            default => 'CITEXT',
         };
     }
     
     private function normalize_type_from_attribute(Type $type, ?string $maxLength): string
     {
+        // Use case-insensitive text so SELECT comparisons ignore letter casing.
+        if ($type === Type::TEXT) {
+            return 'CITEXT';
+        }
         return strtoupper($type->value);
     }
     
