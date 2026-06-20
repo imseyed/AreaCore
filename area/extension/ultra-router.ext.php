@@ -4,10 +4,13 @@ class Router
 {
     private ?string $method = "";
     private static ?array $def = [];
+    private static ?array $path = [];
     public static ?array $var = [];
     public static bool $ALLOW_MULTIPLE = false;
     public static bool $RUN_ACTION = false;
     public static array $uri = [];
+    public static string $requestMethod = "";
+    public static array $allowedMethods = [];
     private array $tempVar = [];
     private bool $isMatch = true;
     
@@ -15,9 +18,14 @@ class Router
     
     static function define($name, $routeUri): void
     {
-        self::$def[$name] = $routeUri;
+        if (str_starts_with($name, ":")){ // for folder
+            self::$path[$name] = $routeUri;
+        }else{ // For url
+            self::$def[$name] = $routeUri;
+        }
         self::requested_uri();
     }
+    
     
     static function prefix($name): string
     {
@@ -38,7 +46,7 @@ class Router
     
     static function get($uri): Router
     {
-        return self::build('any', $uri);
+        return self::build('get', $uri);
     }
     
     static function post($uri): Router
@@ -61,8 +69,23 @@ class Router
         return self::build('patch', $uri);
     }
     
+    static function options($uri): Router
+    {
+        return self::build('options', $uri);
+    }
+    
+    static function fallBack(): Router
+    {
+        $item = new self();
+        $item->method = 'fallBack';
+        return $item;
+    }
+    
     private static function build(string $method, $uri): self
     {
+        if (!in_array($method, ["cli", "options"]))
+            self::$allowedMethods[$uri][] = $method;
+        
         $item = new self();
         
         if (self::$RUN_ACTION && !self::$ALLOW_MULTIPLE){
@@ -73,7 +96,7 @@ class Router
         
         $item->method = $method;
         self::requested_uri();
-        $item->is_match($uri);
+        $item->isMatch = $item->is_match($uri);
         $item->query_parameter($uri);
         return $item;
     }
@@ -81,11 +104,11 @@ class Router
     ## variables
     private static function requested_uri()
     {
-        // var_dump($argv);
         if (self::$uri)
             return;
         $uri = $_SERVER['REQUEST_URI'] ?? "";
         if ($uri){
+            self::$requestMethod = $_SERVER['REQUEST_METHOD'];
             $uri = urldecode($uri);
             $uri = substr($uri, mb_strlen(base));
             $uri = strtolower($uri);
@@ -93,8 +116,10 @@ class Router
             while (str_contains($uri, "//"))
                 $uri = str_replace("//","/",$uri);
             $uri = explode("/", $uri);
-        }else // CLI MODE
+        }else{ // CLI MODE
+            self::$requestMethod = "CLI";
             $uri = $_SERVER["argv"] ?? [];
+        }
         self::$uri = $uri;
     }
     
@@ -108,16 +133,37 @@ class Router
                 return $matches[0];
             // Chek if defined
             if (isset(self::$def[$key]))
-                return self::$def[$key];;
+                return self::$def[$key];
             
             // Return without change if not defined
             return $matches[0];
         }, $pattern);
     }
     
+    private function resolve_paths($pattern)
+    {
+        return preg_replace_callback('/\:([a-zA-Z0-9_]+)/', function ($matches){
+            // $matches[0] = :foo
+            // $matches[1] = foo
+            $key = $matches[0];
+            // پیدا کردن مقدار در path (associative match)
+            if (isset(self::$path[$key])) {
+                return self::$path[$key];
+            }
+            
+            // اگر تعریف نشده بود همان را برگردان
+            return $matches[0];
+        }, $pattern);
+    }
+    
     private function is_match($pattern): bool
     {
+        if (!$this->isMatch)
+            return false;
+        
         $pattern = $this->resolve_definition($pattern);
+        if (!str_starts_with($pattern, "/"))
+            $pattern = "/".$pattern;
         // Ignore GET parameters on pattern, Actually, we'll check it out later
         $pattern = substr($pattern, 0, strpos($pattern, '?')?:strlen($pattern));
         $pattern = explode("/", $pattern);
@@ -125,10 +171,10 @@ class Router
         $hasWildcard = false;
         
         foreach ($pattern as $key=>$item){
-            $equivalent = @self::$uri[$key]; // Equivalent matched part in requested URI
+            if ($key===0) // Don't check first uri because it is `index.php` in cli mode
+                continue;
             
-            if (!$this->isMatch)
-                return false;
+            $equivalent = @self::$uri[$key]; // Equivalent matched part in requested URI
             
             // Patter using variables {bar}
             if (str_starts_with($item, "{") && str_ends_with($item, "}")){
@@ -138,7 +184,6 @@ class Router
             elseif ($item == "[*]"){
                 $hasWildcard = true;
             } elseif (strcasecmp($item, $equivalent) !== 0 && !$hasWildcard){
-                $this->isMatch = false;
                 return false;
             }
         }
@@ -196,7 +241,9 @@ class Router
         if (!$this->check_conditions())
             return $this;
         
-        if (!str_starts_with('/', $fileAddress)) {
+        $fileAddress = $this->resolve_paths($fileAddress);
+        
+        if (!str_starts_with('/', $fileAddress) && !str_starts_with($fileAddress, "./") && !str_starts_with($fileAddress, "../")) {
             $fileAddress = "view/" . $fileAddress;
         }
         if (file_exists($fileAddress)) {
@@ -213,7 +260,6 @@ class Router
         self::$RUN_ACTION = true;
         return $this;
     }
-    
     public function call(callable $callback): Router
     {
         if (!$this->check_conditions())
@@ -274,10 +320,13 @@ class Router
     
     private function check_conditions(): bool
     {
+        if ($this->method == "fallBack")
+            return !self::$RUN_ACTION;
+        
         $inCondition = true;
         if (!$this->isMatch)
             $inCondition = false;
-        if (!in_array($this->method, ['any', 'cli']) && $this->method != strtolower($_SERVER['REQUEST_METHOD']))
+        if (!in_array($this->method, ['any', 'cli']) && self::$requestMethod!="CLI" && $this->method != strtolower(self::$requestMethod))
             $inCondition = false;
         if ($this->method == 'cli' && php_sapi_name() != 'cli')
             $inCondition = false;
@@ -288,5 +337,25 @@ class Router
         }
         self::$var = $this->tempVar;
         return true;
+    }
+    
+    public static function allowed_methods(): array
+    {
+        $allowedMethods = [];
+        foreach (Router::$allowedMethods as $url=>$methodsArray) {
+            $item = new self();
+            if ($item->is_match($url))
+                array_push($allowedMethods, ...$methodsArray);
+        }
+        
+        foreach ($allowedMethods as &$method) {
+            if ($method == "any")
+                array_push($allowedMethods, "GET", "POST", "DELETE", "PUT", "PATCH");
+            else
+                $method = strtoupper($method);
+        }
+        $allowedMethods = array_unique($allowedMethods);
+        $allowedMethods = array_diff($allowedMethods, ['any']);
+        return array_diff($allowedMethods, ['any']);
     }
 }
