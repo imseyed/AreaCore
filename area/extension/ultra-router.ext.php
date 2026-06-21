@@ -187,6 +187,9 @@ class Router
                 return false;
             }
         }
+        
+        if (!$hasWildcard && $this->count_valued_uri($pattern)<$this->count_valued_uri(self::$uri)) // when requested uri is too longer
+            return false;
         return true;
     }
     
@@ -202,6 +205,13 @@ class Router
                 $this->append_var($item, $_GET[$key] ?? null);
             }
         }
+    }
+    
+    private function count_valued_uri($array): int
+    {
+        array_shift($array); // Index 0 is "index.php" in cli mode
+        $array = array_filter($array);
+        return count($array);
     }
     
     private function append_var(string $varInPattern, mixed $equivalentValue): bool
