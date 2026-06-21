@@ -58,6 +58,7 @@ class PostgreSQL_Table
             return self::create();
         }
         if ($needChange = $this->update_table_query()) {
+            var_dump($needChange);
             return PDO_SQL::run_exec($needChange) !== false;
         }
         return false;
@@ -95,10 +96,10 @@ class PostgreSQL_Table
             $isUnique = false;
             $columnType = 'CITEXT';
             $maxLength = null;
-
+            
             if ($reflection->hasProperty($var)) {
                 $prop = $reflection->getProperty($var);
-
+                
                 $lengthAttributes = $prop->getAttributes(Length::class);
                 if (!empty($lengthAttributes)) {
                     /** @var Length $length */
@@ -150,10 +151,10 @@ class PostgreSQL_Table
             $columnType = 'CITEXT';
             $maxLength = null;
             $isUnique = false;
-
+            
             if ($reflection->hasProperty($var)) {
                 $prop = $reflection->getProperty($var);
-
+                
                 $lengthAttrs = $prop->getAttributes(Length::class);
                 if ($lengthAttrs) {
                     $length = $lengthAttrs[0]->newInstance();
@@ -186,7 +187,7 @@ class PostgreSQL_Table
             $isUniqueInDb = (($existingColumnMap[$var]['Key'] ?? '') === 'UNI');
             
             if ($this->should_modify_column($existingType, $expectedType)) {
-                $alterStatements[] = "ALTER COLUMN " . $this->quote($var) . " TYPE " . $this->build_type_definition($columnType, $maxLength);
+                $alterStatements[] = "ALTER COLUMN " . $this->quote($var) . " TYPE " . $this->build_type_definition($columnType, $maxLength) . " USING " . $this->quote($var) . "::" . $this->build_type_definition($columnType, $maxLength);
             }
             
             if ($isUnique && !$isUniqueInDb) {
@@ -300,9 +301,9 @@ class PostgreSQL_Table
     private function normalize_type_from_attribute(Type $type, ?string $maxLength): string
     {
         // Use case-insensitive text so SELECT comparisons ignore letter casing.
-        if ($type === Type::TEXT) {
+        if ($type === Type::TEXT)
             return 'CITEXT';
-        }
+        
         return strtoupper($type->value);
     }
     
