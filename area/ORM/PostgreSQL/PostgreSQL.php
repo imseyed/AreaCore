@@ -28,15 +28,9 @@ trait PostgreSQL
                     }
                 }
                 
-                // In Postgre boolean columns must save as t or f
-                if (is_bool($value)) {
-                    if ($reflection->hasProperty($key)) {
-                        $prop = $reflection->getProperty($key);
-                        $type = $prop->getType();
-                        if ($type && $type->getName() == "bool")
-                            $value = ($value ? "t" : "f");
-                    }
-                }
+                try {
+                    $this->normalize_booleans(get_class($this), $key, $value);
+                } catch (\ReflectionException $e) {}
             }
         }
         return $vars;
@@ -87,7 +81,7 @@ trait PostgreSQL
     static function insert(array $data, string $tableName = null)
     {
         $tableName ??= self::this_class_table();
-        $orm = new PostgreSQL_Data($tableName);
+        $orm = new PostgreSQL_Data($tableName, get_called_class());
         return $orm->insert_array($data);
     }
     
@@ -183,6 +177,11 @@ trait PostgreSQL
         if (!$ID) {
             $ID = $this->ID;
         }
+        
+        try {
+            $this->normalize_booleans(get_class($this), $attribute, $value);
+        } catch (\ReflectionException $e) {}
+        
         $this->$attribute = $value;
         return PDO_SQL::update_one_value($table, $ID, $attribute, $value);
     }
@@ -194,5 +193,20 @@ trait PostgreSQL
             return $this->change($name, $this->$name);
         }
         return false;
+    }
+    
+    /**
+     * In Postgre boolean columns must save as t or f
+     *
+     * @param $className
+     * @param $property
+     * @param $value
+     * @return void
+     * @throws \ReflectionException
+     */
+    private function normalize_booleans($className, $property, &$value): void
+    {
+        if (PostgreSQL_Table::is_boolean_property($className, $property))
+            $value = ($value ? "t" : "f");
     }
 }

@@ -58,7 +58,6 @@ class PostgreSQL_Table
             return self::create();
         }
         if ($needChange = $this->update_table_query()) {
-            var_dump($needChange);
             return PDO_SQL::run_exec($needChange) !== false;
         }
         return false;
@@ -187,7 +186,8 @@ class PostgreSQL_Table
             $isUniqueInDb = (($existingColumnMap[$var]['Key'] ?? '') === 'UNI');
             
             if ($this->should_modify_column($existingType, $expectedType)) {
-                $alterStatements[] = "ALTER COLUMN " . $this->quote($var) . " TYPE " . $this->build_type_definition($columnType, $maxLength) . " USING " . $this->quote($var) . "::" . $this->build_type_definition($columnType, $maxLength);
+                $usingClause = $this->build_using_clause($var, $columnType, $existingType);
+                $alterStatements[] = "ALTER COLUMN " . $this->quote($var) . " TYPE " . $this->build_type_definition($columnType, $maxLength) . " USING " . $usingClause;
             }
             
             if ($isUnique && !$isUniqueInDb) {
@@ -212,6 +212,37 @@ class PostgreSQL_Table
         
         return "CREATE EXTENSION IF NOT EXISTS citext; ALTER TABLE " . $this->quote($tableName) . " " . implode(", ", $alterStatements) . ";";
     }
+    
+    private function build_using_clause(string $columnName, string $targetType, string $existingType, bool $isNullable=true): string
+    {
+        $quoted = $this->quote($columnName);
+        $targetUpper = strtoupper($targetType);
+        $existingLower = strtolower($existingType);
+        
+        // حالت ۱: تبدیل از هر نوعی به BOOLEAN
+        if ($targetUpper === 'BOOLEAN') {
+            $nullFallback = $isNullable ? 'NULL' : 'false';
+            
+            if (preg_match('/^(int|integer|smallint|bigint|numeric|decimal|real|double)/', $existingLower)) {
+                return "CASE WHEN $quoted IS NULL THEN $nullFallback WHEN $quoted = 0 THEN false ELSE true END";
+            }
+            if (preg_match('/^(text|citext|varchar|char)/', $existingLower)) {
+                return "CASE WHEN $quoted IS NULL THEN $nullFallback WHEN $quoted IN ('0','false','f','no','') THEN false ELSE true END";
+            }
+            // fallback عمومی برای انواع دیگر
+            return "CASE WHEN $quoted IS NULL THEN $nullFallback ELSE $quoted::boolean END";
+        }
+        
+        // حالت ۲: تبدیل از BOOLEAN به هر نوع دیگری -> باید 1/0 بشه
+        if (preg_match('/^bool/', $existingLower)) {
+            $nullFallback = $isNullable ? 'NULL' : '0';
+            return "CASE WHEN $quoted IS NULL THEN $nullFallback WHEN $quoted THEN 1 ELSE 0 END";
+        }
+        
+        // بقیه تبدیل‌ها cast معمولی
+        return "$quoted::" . $this->build_type_definition($targetType, null);
+    }
+    
     
     private function index_definition_query(): string
     {
@@ -338,4 +369,25 @@ class PostgreSQL_Table
             }
         }
     }
+    
+    static function is_boolean_property($className, $property): bool
+    {
+        $reflection = new ReflectionClass($className);
+        if (!$reflection->hasProperty($property))
+            return false;
+        
+        $prop = $reflection->getProperty($property);
+        $type = $prop->getType();
+        
+        if ($type && $type->getName() == "bool") {
+            return true;
+        } elseif (!empty($prop->getAttributes(Length::class))) {
+            $lengthAttributes = $prop->getAttributes(Length::class);
+            $length = $lengthAttributes[0]->newInstance();
+            if (strtolower($length->type->value) == "boolean")
+                return true;
+        }
+        return false;
+    }
+    
 }

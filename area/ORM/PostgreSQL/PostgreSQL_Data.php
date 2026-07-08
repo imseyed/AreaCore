@@ -149,7 +149,10 @@ class PostgreSQL_Data
             if ($this->isNULL) {
                 foreach ($this->isNULL as $item) {
                     $q = $this->quote((string)$item);
-                    $query .= "($q IS NULL OR $q = '') AND ";
+                    if (PostgreSQL_Table::is_boolean_property($this->calledClass, $item)) // اگر بولین هست به صورت رشته خالی چک نشه
+                        $query .= "$q IS NULL AND ";
+                    else
+                        $query .= "($q = '' OR $q IS NULL) AND ";
                 }
             }
             if (str_ends_with($query, "AND ")) {
@@ -239,9 +242,14 @@ class PostgreSQL_Data
             if (preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $item)) {
                 $q = $this->quote($item);
                 if ($value === '') {
-                    $query .= "($q = '' OR $q IS NULL) AND ";
+                    if (PostgreSQL_Table::is_boolean_property($this->calledClass, $item)) // اگر بولین هست به صورت رشته خالی چک نشه
+                        $query .= "$q IS NULL AND ";
+                    else
+                        $query .= "($q = '' OR $q IS NULL) AND ";
                 } else {
                     $query .= "$q = ? AND ";
+                    if (PostgreSQL_Table::is_boolean_property($this->calledClass, $item) && is_bool($value))
+                        $value = $value ? "t" : "f";
                     $this->executes[] = $value;
                 }
                 continue;
