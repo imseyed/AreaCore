@@ -19,6 +19,7 @@ class PostgreSQL_Data
     private string $sort = "ID";
     private array $notNULL = [];
     private array $isNULL = [];
+    private array $jsonWhere = [];
     private array $executes = [];
     private ?object $objectForSet = null;
     private string $action = '';
@@ -117,8 +118,21 @@ class PostgreSQL_Data
         return $this;
     }
     
+    public function jsonb(string $column): PostgreSQL_DataJson
+    {
+        return new PostgreSQL_DataJson($this, $column);
+    }
+    
+    public function add_json_condition(string $condition, array $executes = [], string $boolean = 'AND'): static
+    {
+        $boolean = strtoupper($boolean) === 'OR' ? 'OR' : 'AND';
+        $this->jsonWhere[] = [$boolean, $condition, $executes];
+        return $this;
+    }
+    
     public function create_query(): string
     {
+        $this->executes = [];
         $countAlias = PDO_SQL::count_alias();
         $query = match ($this->action) {
             'select' => "SELECT ",
@@ -135,7 +149,7 @@ class PostgreSQL_Data
         }
         
         $query .= "FROM " . $this->quote($this->table) . " ";
-        if ($this->con || $this->notNULL || $this->isNULL) {
+        if ($this->con || $this->notNULL || $this->isNULL || $this->jsonWhere) {
             $query .= "WHERE ";
             if ($this->con) {
                 $this->main_query($query, $this->con);
@@ -153,6 +167,18 @@ class PostgreSQL_Data
                         $query .= "$q IS NULL AND ";
                     else
                         $query .= "($q = '' OR $q IS NULL) AND ";
+                }
+            }
+            if ($this->jsonWhere) {
+                foreach ($this->jsonWhere as [$boolean, $condition, $executes]) {
+                    if ($boolean === 'OR') {
+                        if (str_ends_with($query, "AND ")) {
+                            $query = substr($query, 0, -4);
+                        }
+                        $query .= "OR ";
+                    }
+                    $query .= "($condition) AND ";
+                    array_push($this->executes, ...$executes);
                 }
             }
             if (str_ends_with($query, "AND ")) {

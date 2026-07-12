@@ -5,6 +5,7 @@ require_once "PostgreSQL/PDO_Fetch.php";
 require_once "PostgreSQL/PostgreSQL.php";
 require_once "PostgreSQL/PostgreSQL_Table.php";
 require_once "PostgreSQL/PostgreSQL_Data.php";
+require_once "PostgreSQL/PostgreSQL_DataJson.php";
 require_once "PostgreSQL/PostgreSQL_Arrtibute.php";
 
 global $DB_Config;
