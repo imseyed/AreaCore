@@ -165,7 +165,7 @@ class MySQL_Data
                 break;
         }
         foreach ($conditions as $item => $value) {
-            if (is_array($value)){
+            if (is_array($value) && is_numeric($item)) { // () Conditions hasn't key so indexes by numbers 0, 1, 2
                 if (array_key_first($value)=="|"){ // Example ['age>'=>18, 'gender'=>"female"], ['|'=>null, 'age<'=>18, 'gender'=>"male", '|gender'=>"female"]
                     array_shift($value);
                     $this->main_query($query, $value, "OR");
@@ -207,7 +207,12 @@ class MySQL_Data
                 if (preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $item)) {
                     if ($value === '')
                         $query .= "(`$item` = '' OR `$item` IS NULL) AND ";
-                    else{
+                    elseif(is_array($value) && count($value) > 0) {
+                        $query .= "`$item` IN (".implode(", ", (array_fill(0, count($value), "?"))).") AND ";
+                        foreach ($value as $v) {
+                            $this->executes[] = $v;
+                        }
+                    }else{
                         $query .= "`$item` = ? AND ";
                         $this->executes[] = $value;
                     }

@@ -222,7 +222,7 @@ class PostgreSQL_Data
         }
         
         foreach ($conditions as $item => $value) {
-            if (is_array($value)) {
+            if (is_array($value) && is_numeric($item)) { // () Conditions hasn't key so indexes by numbers 0, 1, 2
                 if (array_key_first($value) == "|") {
                     array_shift($value);
                     $this->main_query($query, $value, "OR");
@@ -272,7 +272,12 @@ class PostgreSQL_Data
                         $query .= "$q IS NULL AND ";
                     else
                         $query .= "($q = '' OR $q IS NULL) AND ";
-                } else {
+                } elseif(is_array($value) && count($value) > 0) {
+                    $query .= "$q IN (".implode(", ", (array_fill(0, count($value), "?"))).") AND ";
+                    foreach ($value as $v) {
+                        $this->executes[] = $v;
+                    }
+                }else{
                     $query .= "$q = ? AND ";
                     if (PostgreSQL_Table::is_boolean_property($this->calledClass, $item) && is_bool($value))
                         $value = $value ? "t" : "f";
