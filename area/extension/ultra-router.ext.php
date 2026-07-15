@@ -174,7 +174,7 @@ class Router
             if ($key===0) // Don't check first uri because it is `index.php` in cli mode
                 continue;
             
-            $equivalent = @self::$uri[$key]; // Equivalent matched part in requested URI
+            $equivalent = self::$uri[$key]??""; // Equivalent matched part in requested URI
             
             // Patter using variables {bar}
             if (str_starts_with($item, "{") && str_ends_with($item, "}")){
@@ -255,6 +255,10 @@ class Router
         
         if (!str_starts_with('/', $fileAddress) && !str_starts_with($fileAddress, "./") && !str_starts_with($fileAddress, "../")) {
             $fileAddress = "view/" . $fileAddress;
+        }elseif (str_starts_with($fileAddress, "./") || str_starts_with($fileAddress, "../")){
+            $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 1);
+            $callerDir = dirname($trace[0]['file']);
+            $fileAddress = "$callerDir/$fileAddress";
         }
         if (file_exists($fileAddress)) {
             include $fileAddress;
