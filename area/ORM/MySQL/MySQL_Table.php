@@ -12,6 +12,7 @@ class MySQL_Table
     private array $properties;
     private string $calledClass;
     private array $indexes = array();
+    private bool $changeStructure = false;
     
     public function __construct(string $table, $properties, $calledClass=null)
     {
@@ -42,6 +43,7 @@ class MySQL_Table
     
     public function create($replace=true): bool
     {
+        $this->changeStructure = true;
         return PDO_SQL::run_exec($this->create_table_query($replace))!==false;
     }
     
@@ -52,6 +54,7 @@ class MySQL_Table
     
     public function update(): bool
     {
+        $this->changeStructure = true;
         if (!PDO_SQL::table_exist($this->table)){
             return self::create();
         }
@@ -404,7 +407,7 @@ class MySQL_Table
     }
     public function __destruct()
     {
-        if ($this->table) { //Must update indexes when finish create or update table
+        if ($this->changeStructure && $this->table) { //Must update indexes when finish create or update table
             $indexesQuery = $this->index_definition_query();
             // echo $indexesQuery;
             if ($indexesQuery)
