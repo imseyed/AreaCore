@@ -2,6 +2,8 @@
 
 namespace ORM\PostgreSQL;
 
+use AreaCore\ORM\PostgreSQL\PostgreSQL_Table;
+
 /**
  * @property null|array $do Return all array data
  * @property null|bool|PDO_Fetch|array $ro Return rows one by one
@@ -82,16 +84,17 @@ class PostgreSQL_Data
         }
         if (str_starts_with($column, '#')) {
             $column = str_replace('#', '', $column);
-            $this->sort = $this->quote($column);
-        } else {
             $decimalDigitsCount = (str_contains($column, '.') ? strlen($column) - strpos($column, '.') - 1 : 0);
             $this->sort = "CAST(" . $this->quote($column) . " AS DECIMAL(10, " . $decimalDigitsCount . "))";
+        } else {
+            $this->sort = $this->quote($column);
         }
         return $this;
     }
     
     public function table(string $table): static
     {
+        $table = PostgreSQL_Table::normalize_table_name($table);
         $this->table = $table;
         return $this;
     }

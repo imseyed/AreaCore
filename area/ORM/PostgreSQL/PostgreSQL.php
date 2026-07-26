@@ -2,6 +2,7 @@
 
 namespace ORM\PostgreSQL;
 
+use AreaCore\ORM\PostgreSQL\PostgreSQL_Table;
 use ReflectionClass;
 use ReflectionProperty;
 
@@ -10,8 +11,7 @@ trait PostgreSQL
     static private function this_class_table(): string
     {
         $tableName = get_called_class();
-        $tableName = strtolower($tableName);
-        return str_replace("\\", "/", $tableName);
+        return PostgreSQL_Table::normalize_table_name($tableName);
     }
     
     public function get_vars($valued = true, $hasColumn = true): array

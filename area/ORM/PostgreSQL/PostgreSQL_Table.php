@@ -1,7 +1,12 @@
 <?php
 
-namespace ORM\PostgreSQL;
+namespace AreaCore\ORM\PostgreSQL;
 
+use ORM\PostgreSQL\Index;
+use ORM\PostgreSQL\Length;
+use ORM\PostgreSQL\PDO_SQL;
+use ORM\PostgreSQL\Type;
+use ORM\PostgreSQL\Unique;
 use ReflectionClass;
 
 class PostgreSQL_Table
@@ -391,6 +396,12 @@ class PostgreSQL_Table
                 return true;
         }
         return false;
+    }
+    
+    static function normalize_table_name(string $tableName): string
+    {
+        $tableName = strtolower($tableName);
+        return str_replace("\\", "/", $tableName);
     }
     
 }
