@@ -60,7 +60,7 @@ trait MySQL
         return array_diff($publicProperties, $staticProperties);
     }
     
-    static function table(?string $tableName=null): MySQL_Table
+    static function table(?string $tableName = null): MySQL_Table
     {
         $tableName ??= self::this_class_table();
         $properties = self::properties();
@@ -84,10 +84,10 @@ trait MySQL
     public function clear():void
     {
         foreach ($this as $item=>$value)
-            @$this->{$item}=null;
+            @$this->{$item} = null;
     }
     
-    static function insert(array $data, string $tableName=null)
+    static function insert(array $data, ?string $tableName = null)
     {
         $tableName ??= self::this_class_table();
         $orm = new MySQL_Data($tableName);
@@ -112,7 +112,7 @@ trait MySQL
         return $orm->set_condition($con, 'count');
     }
     
-    static function last_ID(string $table=null): bool|int
+    static function last_ID(?string $table = null): bool|int
     {
         $table ??= self::this_class_table();
         return PDO_SQL::last_id($table);
@@ -148,7 +148,7 @@ trait MySQL
         return (bool)$this->ID;
     }
     
-    public function save(string|null $table=null,bool $newRow=false): bool|int
+    public function save(?string $table = null,bool $newRow=false): bool|int
     {
         $table ??= self::this_class_table();
         $vars = $this->get_vars(false);
@@ -169,7 +169,7 @@ trait MySQL
         return false;
     }
     
-    public function change($attribute,$value, $ID=null, $table=null): bool
+    public function change($attribute,$value, $ID = null, $table = null): bool
     {
         $reflection = new ReflectionClass(get_class($this));
         if (!$reflection->hasProperty($attribute))

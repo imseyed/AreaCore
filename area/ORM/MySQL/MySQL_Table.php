@@ -14,7 +14,7 @@ class MySQL_Table
     private array $indexes = array();
     private bool $changeStructure = false;
     
-    public function __construct(string $table, $properties, $calledClass=null)
+    public function __construct(string $table, $properties, $calledClass = null)
     {
         $this->table = $table;
         $this->properties = $properties;

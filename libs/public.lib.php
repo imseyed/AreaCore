@@ -71,9 +71,11 @@ function search_2D(string $key, mixed $needle, ?array $array, bool $DD = false, 
 	// $DD: 2D Export (all existing rows)
 	$keys = array_keys(array_column($array, $key), $needle);
 	$array = array_intersect_key($array, array_flip($keys));
-	
-	if (!$DD)
-		return $array[array_key_first($array)] ?: [];
+    
+    if (!$DD) {
+        $firstKey = array_key_first($array);
+        return $firstKey !== null ? $array[$firstKey] : [];
+    }
 	
 	if ($reIndex)
 		return array_values($array);

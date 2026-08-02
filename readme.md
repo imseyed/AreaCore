@@ -1,10 +1,9 @@
+<img width="800" height="500" alt="Areacore-wave" src="https://github.com/user-attachments/assets/ff1dc8aa-c7cf-430f-800f-1e4d65719701" />
 
 # Areacore
 
 > A lightweight, extensible PHP framework for both web applications and CLI services.
 
-
-[![PHP](https://img.shields.io/badge/PHP%20Framework:-Area%20Core-blue?logo=php&color=4f5b93)](https://php.net)
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-blue?logo=php)](https://php.net)
 ![Last Commit](https://img.shields.io/github/last-commit/imseyed/AreaCore?style=flat-square)
 ![Visitors](https://visitor-badge.laobi.icu/badge?page_id=imseyed.AreaCore?color=red)
@@ -124,14 +123,13 @@ No additional dependencies required.
 
 ## 📚 Documentation
 
-| Document                                             | Description                            |
-|------------------------------------------------------|----------------------------------------|
-| [Project Structure](docs/framework/structure.md)     | Directory layout and file organization |
-| [Router](docs/framework/router.md)                   | Full routing API reference             |
-| [ORM](docs/framework/orm.md)                         | Database layer and model usage         |
-| [Quick Start](docs/framework/quick-start.md)         | Step-by-step getting started guide     |
-| [Contributing](docs/framework/contribute.md)         | How to contribute to Areacore          |
-| [Web Server Deployment](docs/framework/webserver.md) | How to deploy using any web server     |
+| Document                                         | Description                            |
+|--------------------------------------------------|----------------------------------------|
+| [Project Structure](docs/framework/structure.md) | Directory layout and file organization |
+| [Router](docs/framework/router.md)               | Full routing API reference             |
+| [ORM](docs/framework/orm.md)                     | Database layer and model usage         |
+| [Quick Start](docs/framework/quick-start.md)     | Step-by-step getting started guide     |
+| [Contributing](docs/framework/contribute.md)     | How to contribute to Areacore          |
 
 ---
 

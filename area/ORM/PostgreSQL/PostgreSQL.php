@@ -78,7 +78,7 @@ trait PostgreSQL
         }
     }
     
-    static function insert(array $data, string $tableName = null)
+    static function insert(array $data, ?string $tableName = null)
     {
         $tableName ??= self::this_class_table();
         $orm = new PostgreSQL_Data($tableName, get_called_class());
@@ -105,7 +105,7 @@ trait PostgreSQL
         return $orm->set_condition($con, 'count');
     }
     
-    static function last_ID(string $table = null): bool|int
+    static function last_ID(?string $table = null): bool|int
     {
         $table ??= self::this_class_table();
         return PDO_SQL::last_id($table);
@@ -144,7 +144,7 @@ trait PostgreSQL
         return (bool)$this->ID;
     }
     
-    public function save(string|null $table = null, bool $newRow = false): bool|int
+    public function save(?string $table = null, bool $newRow = false): bool|int
     {
         $table ??= self::this_class_table();
         $vars = $this->get_vars(false);
