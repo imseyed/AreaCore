@@ -9,7 +9,7 @@
  */
 function enter_to_br(string $text): string
 {
-	return str_replace("\n", "<br/>", str_replace("\r", "<br/>", str_replace("\r\n", "<br/>", $text)));
+    return str_replace("\n", "<br/>", str_replace("\r", "<br/>", str_replace("\r\n", "<br/>", $text)));
 }
 
 /**
@@ -20,7 +20,7 @@ function enter_to_br(string $text): string
  */
 function enter_to_null(string $text): string
 {
-	return str_replace("\n", "", str_replace("\r", "", str_replace("\r\n", "", $text)));
+    return str_replace("\n", "", str_replace("\r", "", str_replace("\r\n", "", $text)));
 }
 
 /**
@@ -34,19 +34,19 @@ function enter_to_null(string $text): string
 
 function determiner(string $string = "", string $separator = "\n"): array
 {
-	// Normalize newline characters in the string
-	if ($separator == "\r\n") {
-		$separator = "\n";
-	}
-	if ($separator == "\r") {
-		$separator = "\n";
-	}
-	
-	$string = str_replace("\r\n", "\n", $string);
-	$string = str_replace("\r", "\n", $string);
-	
-	// Filter and explode the string based on the specified separator
-	return array_filter(explode($separator, $string));
+    // Normalize newline characters in the string
+    if ($separator == "\r\n") {
+        $separator = "\n";
+    }
+    if ($separator == "\r") {
+        $separator = "\n";
+    }
+    
+    $string = str_replace("\r\n", "\n", $string);
+    $string = str_replace("\r", "\n", $string);
+    
+    // Filter and explode the string based on the specified separator
+    return array_filter(explode($separator, $string));
 }
 
 /**
@@ -62,25 +62,26 @@ function determiner(string $string = "", string $separator = "\n"): array
  */
 function search_2D(string $key, mixed $needle, ?array $array, bool $DD = false, bool $reIndex = false): array
 {
-	if (!is_array($array) || count($array) == 0)
-		return [];
-	
-	if (!$key)
-		$key = 'ID';
-	
-	// $DD: 2D Export (all existing rows)
-	$keys = array_keys(array_column($array, $key), $needle);
-	$array = array_intersect_key($array, array_flip($keys));
+    if (!is_array($array) || count($array) == 0)
+        return [];
+    
+    if (!$key)
+        $key = 'ID';
+    
+    // $DD: 2D Export (all existing rows)
+    $keys = array_keys(array_column($array, $key), $needle);
+    $array = array_intersect_key($array, array_flip($keys));
     
     if (!$DD) {
         $firstKey = array_key_first($array);
+        
         return $firstKey !== null ? $array[$firstKey] : [];
     }
-	
-	if ($reIndex)
-		return array_values($array);
-	
-	return $array;
+    
+    if ($reIndex)
+        return array_values($array);
+    
+    return $array;
 }
 
 use function search_2D as search_2D_array; // Create aliases function * Just work on this file
@@ -100,7 +101,7 @@ func_alias('search_2D_array', 'search_2D');
  */
 function in(...$vars): bool
 {
-	return in_array(...$vars);
+    return in_array(...$vars);
 }
 
 /**
@@ -124,9 +125,9 @@ function len(string|array $var): int
  */
 function checkbox_null_to_0(array &$form, ...$vars): void
 {
-	foreach ($vars as $var) {
-		if (!@$form[$var]) $form[$var] = "0";
-	}
+    foreach ($vars as $var) {
+        if (!@$form[$var]) $form[$var] = "0";
+    }
 }
 
 /**
@@ -138,9 +139,9 @@ function checkbox_null_to_0(array &$form, ...$vars): void
  */
 function checkbox_null_to_empty(array &$form, ...$vars): void
 {
-	foreach ($vars as $var) {
-		if (!@$form[$var]) $form[$var] = "";
-	}
+    foreach ($vars as $var) {
+        if (!@$form[$var]) $form[$var] = "";
+    }
 }
 
 /**
@@ -151,13 +152,13 @@ function checkbox_null_to_empty(array &$form, ...$vars): void
  */
 function is_english(...$vars): bool
 {
-	$vars = array_map(function($var){
-		return preg_match('/^[0-9a-zA-Z]+$/', $var);
-	}, $vars);
-	
-	$vars = array_unique($vars);
-	
-	return $vars[0] && count($vars) == 1;
+    $vars = array_map(function($var){
+        return preg_match('/^[0-9a-zA-Z]+$/', $var);
+    }, $vars);
+    
+    $vars = array_unique($vars);
+    
+    return $vars[0] && count($vars) == 1;
 }
 
 /**
@@ -167,9 +168,9 @@ function is_english(...$vars): bool
  * @param string $decimalSeparator The decimal separator to use (default is '٫').
  */
 function num_to_persian(string $str, string $decimalSeparator = '٫'): string {
-	$num_a = array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.');
-	$key_a = array('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹', $decimalSeparator);
-	return str_replace($num_a, $key_a, $str);
+    $num_a = array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.');
+    $key_a = array('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹', $decimalSeparator);
+    return str_replace($num_a, $key_a, $str);
 }
 
 /**
@@ -180,11 +181,11 @@ function num_to_persian(string $str, string $decimalSeparator = '٫'): string {
  */
 function persianNum_to_english(string $string): string
 {
-	$persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-	$arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-	
-	$num = range(0, 9);
-	$convertedPersianNums = str_replace($persian, $num, $string);
+    $persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+    $arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    
+    $num = range(0, 9);
+    $convertedPersianNums = str_replace($persian, $num, $string);
     return str_replace($arabic, $num, $convertedPersianNums);
 }
 
@@ -197,12 +198,12 @@ function persianNum_to_english(string $string): string
  */
 function show_input_image($image, $fullUrl = false): string
 {
-	if (is_file('view/' . $image)) {
-		if ($fullUrl)
-			return protocol . siteAddress . '/view/' . $image;
-		return base . '/view/' . $image;
-	}
-	return $image;
+    if (is_file('view/' . $image)) {
+        if ($fullUrl)
+            return protocol . siteAddress . '/view/' . $image;
+        return base . '/view/' . $image;
+    }
+    return $image;
 }
 
 /**
@@ -215,15 +216,15 @@ function show_input_image($image, $fullUrl = false): string
  */
 function redirect(string $dist, int $delay = 0): void
 {
-	if (str_starts_with($dist, base)){
-		$dist = substr($dist, strlen(base));
-	}
-	$dist = ltrim($dist, "/");
-	if ($delay) {
-		header("Refresh: $delay;url=" . base . "/" . $dist);
-	} else {
-		header("Location: " . base . "/" . $dist);
-	}
+    if (str_starts_with($dist, base)){
+        $dist = substr($dist, strlen(base));
+    }
+    $dist = ltrim($dist, "/");
+    if ($delay) {
+        header("Refresh: $delay;url=" . base . "/" . $dist);
+    } else {
+        header("Location: " . base . "/" . $dist);
+    }
 }
 
 /**
@@ -234,9 +235,9 @@ function redirect(string $dist, int $delay = 0): void
  */
 function sum(...$nums): int
 {
-	if (is_array(@$nums[0]))
-		$nums = array_merge(...$nums);
-	return array_sum($nums);
+    if (is_array(@$nums[0]))
+        $nums = array_merge(...$nums);
+    return array_sum($nums);
 }
 
 /**
@@ -248,9 +249,9 @@ function sum(...$nums): int
  */
 function average(...$nums): int|float
 {
-	if (is_array(@$nums[0]))
-		$nums = array_merge(...$nums);
-	return array_sum($nums) / count($nums);
+    if (is_array(@$nums[0]))
+        $nums = array_merge(...$nums);
+    return array_sum($nums) / count($nums);
 }
 
 
@@ -268,7 +269,7 @@ function rand_string(int $length = 10, string $mode='combine'): string
         'letter'=> 'abcdefghijklmnopqrstuvwxyz',
         'upperCase'=> 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
         'number'=> '0123456789',
-	    default=>'0123456789abcdefghijklmnopqrstuvwxyz'
+        default=>'0123456789abcdefghijklmnopqrstuvwxyz'
     };
     return substr(str_shuffle(str_repeat($mode, mt_rand(1,$length))), 1, $length);
 }
@@ -316,7 +317,7 @@ function upload_image($file_uploaded,$place,$replace_with=null,$name=null,$rand_
                 }
                 $file_name = substr($file_name,0,-1);
             }
-	        $file_name = "$file_name.$end";
+            $file_name = "$file_name.$end";
         }else{
             $file_name = $name;
         }
@@ -331,11 +332,11 @@ function upload_image($file_uploaded,$place,$replace_with=null,$name=null,$rand_
         }
     }
     return "a";
-	//a= File not found
-	//b= Exceeds the allowed size limit
-	//c= Invalid file extension
-	//d= Directory not found
-
+    //a= File not found
+    //b= Exceeds the allowed size limit
+    //c= Invalid file extension
+    //d= Directory not found
+    
 }
 
 /**
@@ -374,7 +375,7 @@ function upload_file($file_uploaded, $place, $replace_with=null, $name=null, $ra
         if (in_array(strtolower($end), array("php","php5","php7","php8","phtml"))) {
             return "c";
         }
-		
+        
         if (empty($name)){
             if (empty($rand_name)){//نام خود فایل
                 $file_name = basename($image['name']);
@@ -397,11 +398,11 @@ function upload_file($file_uploaded, $place, $replace_with=null, $name=null, $ra
         }else{return "d";}
     }
     return "a";
-	//a= File not found
-	//b= Exceeds the allowed size limit
-	//c= Invalid file extension
-	//d= Directory not found
-	//e= Not enough space
+    //a= File not found
+    //b= Exceeds the allowed size limit
+    //c= Invalid file extension
+    //d= Directory not found
+    //e= Not enough space
 }
 
 /**
@@ -427,15 +428,11 @@ function trim_and_special_chars(&$value): void
  */
 function get_form_data(string $method = "post"): array
 {
-	$form = match (strtolower($method)){
-        "post"=>$_POST,
-        "get"=>$_GET,
-        "files"=>$_FILES,
-        "request"=>$_REQUEST
-    };
+    $form = get_form_data_html($method);
+    
     return array_map(function ($value){
-	    trim_and_special_chars($value);
-		return $value;
+        trim_and_special_chars($value);
+        return $value;
     },$form);
 }
 
@@ -447,11 +444,16 @@ function get_form_data(string $method = "post"): array
  */
 function get_form_data_html(string $method = "post"): array
 {
+    $data = file_get_contents("php://input");
+    parse_str($data, $parsed);
+    
     return match (strtolower($method)){
-        "post"=>$_POST,
         "get"=>$_GET,
+        "post"=>$_POST,
+        "patch", "put", "delete"=>$parsed,
         "files"=>$_FILES,
-        "request"=>$_REQUEST
+        "request"=>$_REQUEST,
+        default=>[]
     };
 }
 
@@ -536,10 +538,10 @@ function copy_folder(string $source, string $destination): bool
 {
     if (!is_dir($source))
         return false; // Destination folder not exist
-
+    
     if (!is_dir($destination) && !mkdir($destination))
         return false; // Create destination folder is not successfully
-
+    
     foreach (scandir($source) as $file) {
         if ($file === '.' || $file === '..')
             continue;
@@ -588,16 +590,16 @@ function get_page(string $url):string
  */
 function size_unit_format(int $bytes, int $decimal = 2, string $unit = ''): string
 {
-	$units = ['TB' => 1099511627776, 'GB' => 1073741824, 'MB' => 1048576, 'KB' => 1024];
-	if ($unit && array_key_exists($unit, $units)) {
-		return number_format($bytes / $units[$unit], $decimal) . ' ' . $unit;
-	}
-	foreach ($units as $key => $value) {
-		if ($bytes >= $value) {
-			return number_format($bytes / $value, $decimal) . ' ' . $key;
-		}
-	}
-	return $bytes > 1 ? $bytes . ' bytes' : ($bytes == 1 ? $bytes . ' byte' : '0 bytes');
+    $units = ['TB' => 1099511627776, 'GB' => 1073741824, 'MB' => 1048576, 'KB' => 1024];
+    if ($unit && array_key_exists($unit, $units)) {
+        return number_format($bytes / $units[$unit], $decimal) . ' ' . $unit;
+    }
+    foreach ($units as $key => $value) {
+        if ($bytes >= $value) {
+            return number_format($bytes / $value, $decimal) . ' ' . $key;
+        }
+    }
+    return $bytes > 1 ? $bytes . ' bytes' : ($bytes == 1 ? $bytes . ' byte' : '0 bytes');
 }
 
 /**
@@ -636,9 +638,9 @@ function make_dirs_if_not_exist(...$folders):void
  */
 function normalize_path($path): string
 {
-	$path = str_replace("\\", "/", $path);
-	$path = preg_replace("#/{2,}#", "/", $path);
-	return rtrim($path, '/');
+    $path = str_replace("\\", "/", $path);
+    $path = preg_replace("#/{2,}#", "/", $path);
+    return rtrim($path, '/');
 }
 
 /**
@@ -649,10 +651,10 @@ function normalize_path($path): string
  */
 function __(...$echoString): mixed
 {
-	global $localLanguage, $translate;
-	if($localLanguage && !$translate && file_exists("view/languages/$localLanguage.json")){ // Load $translate global file at first function call
-		$translate = json_decode(file_get_contents("view/languages/$localLanguage.json"), 1);
-	}
+    global $localLanguage, $translate;
+    if($localLanguage && !$translate && file_exists("view/languages/$localLanguage.json")){ // Load $translate global file at first function call
+        $translate = json_decode(file_get_contents("view/languages/$localLanguage.json"), 1);
+    }
     if ($localLanguage && !empty($translate)) {
         foreach ($echoString as &$item) {
             // if string contains Comma
@@ -671,10 +673,10 @@ function __(...$echoString): mixed
             }
         }
     }
-	
-	if(count($echoString)>1)
-		return sprintf(...$echoString);
-	return $echoString[0];
+    
+    if(count($echoString)>1)
+        return sprintf(...$echoString);
+    return $echoString[0];
 }
 
 /**
@@ -688,8 +690,8 @@ function __(...$echoString): mixed
  * @return mixed
  */
 function HEREDOC($param): mixed{
-	// just return whatever has been passed to us
-	return $param;
+    // just return whatever has been passed to us
+    return $param;
 }
 $HEREDOC = 'HEREDOC';
 
