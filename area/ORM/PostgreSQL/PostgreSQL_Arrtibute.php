@@ -3,13 +3,13 @@ namespace ORM\PostgreSQL;
 
 use Attribute;
 
-#[Attribute]
+#[Attribute(Attribute::TARGET_PROPERTY)]
 class NoColumn {}
 
-#[Attribute]
+#[Attribute(Attribute::TARGET_PROPERTY)]
 class Index {}
 
-#[Attribute]
+#[Attribute(Attribute::TARGET_PROPERTY)]
 class Unique {}
 
 #[Attribute(Attribute::TARGET_PROPERTY)]

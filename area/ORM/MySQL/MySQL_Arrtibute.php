@@ -3,14 +3,18 @@ namespace ORM\MySQL;
 
 use Attribute;
 
-#[Attribute]
+#[Attribute(Attribute::TARGET_PROPERTY)]
 class NoColumn {}
 
-#[Attribute]
+#[Attribute(Attribute::TARGET_PROPERTY)]
 class Index {}
 
-#[Attribute]
+#[Attribute(Attribute::TARGET_PROPERTY)]
 class Unique {}
+
+#[Attribute(Attribute::TARGET_PROPERTY)]
+// MySQL string comparisons are case-insensitive by default.
+class NoCase {}
 
 enum Type: string {
     case BOOL = 'tinyint(1)';

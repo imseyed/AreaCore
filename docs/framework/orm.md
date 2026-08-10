@@ -451,6 +451,44 @@ Each model property becomes a database column by default.
 
 ---
 
+## PostgreSQL Case-Insensitive Search
+
+`#[NoCase]` is available only for the PostgreSQL ORM. Apply it to a text property when searches on that column must ignore letter case.
+
+```php
+use ORM\PostgreSQL\NoCase;
+use ORM\PostgreSQL\Index;
+
+class User
+{
+    use PostgreSQL;
+
+    #[NoCase]
+    #[Index]
+    public string $email;
+}
+```
+
+For `NoCase` properties, PostgreSQL query conditions use `LOWER()` for both the column and the searched value. This applies to equality, comparison, `IN`, and `LIKE` conditions.
+
+```php
+User::get(email: 'User@Example.com')->do;
+User::get(['*email*' => 'example'])->do;
+```
+
+The generated conditions are equivalent to:
+
+```sql
+LOWER("email") = LOWER(?)
+LOWER("email") LIKE LOWER(?)
+```
+
+When `#[NoCase]` and `#[Index]` are both present, the PostgreSQL ORM creates an expression index on `LOWER("email")`. This lets PostgreSQL use the index for the case-insensitive conditions above.
+
+`#[NoCase]` is not needed for MySQL. MySQL string comparisons are case-insensitive by default with the ORM's standard collation behavior.
+
+---
+
 ## 🏗️ Table Operations
 
 ### Create
