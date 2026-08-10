@@ -51,6 +51,7 @@ class PostgreSQL_Table
     public function create($replace = true): bool
     {
         $this->changeStructure = true;
+        echo $this->create_table_query($replace);
         return PDO_SQL::run_exec($this->create_table_query($replace)) !== false;
     }
     
@@ -86,7 +87,8 @@ class PostgreSQL_Table
         $tableName = $this->table;
         $vars = $this->properties;
         
-        $query = 'CREATE EXTENSION IF NOT EXISTS citext; ';
+        $query = '';
+        $usesCitext = false;
         if ($replace) {
             $query .= "DROP TABLE IF EXISTS " . $this->quote($tableName) . "; ";
         }
@@ -101,7 +103,7 @@ class PostgreSQL_Table
             }
             
             $isUnique = false;
-            $columnType = 'CITEXT';
+            $columnType = 'TEXT';
             $maxLength = null;
             
             if ($reflection->hasProperty($var)) {
@@ -126,13 +128,16 @@ class PostgreSQL_Table
             }
             
             $columnDef = $this->quote($var) . " " . $this->build_type_definition($columnType, $maxLength) . " NULL";
+            if (strtoupper($columnType) === 'CITEXT') {
+                $usesCitext = true;
+            }
             if ($isUnique) {
                 $columnDef .= " UNIQUE";
             }
             $query .= $columnDef . ",";
         }
         
-        $query = rtrim($query, ',') . ");";
+        $query = ($usesCitext ? 'CREATE EXTENSION IF NOT EXISTS citext; ' : '') . rtrim($query, ',') . ");";
         return $query;
     }
     
@@ -149,13 +154,14 @@ class PostgreSQL_Table
         }
         
         $alterStatements = [];
+        $usesCitext = false;
         
         foreach ($vars as $var) {
             if ($var === "ID") {
                 continue;
             }
             
-            $columnType = 'CITEXT';
+            $columnType = 'TEXT';
             $maxLength = null;
             $isUnique = false;
             
@@ -180,6 +186,9 @@ class PostgreSQL_Table
             }
             
             $definition = $this->build_type_definition($columnType, $maxLength) . " NULL";
+            if (strtoupper($columnType) === 'CITEXT') {
+                $usesCitext = true;
+            }
             
             if (!isset($existingColumnMap[$var])) {
                 $alterStatements[] = "ADD COLUMN " . $this->quote($var) . " " . $definition;
@@ -218,7 +227,8 @@ class PostgreSQL_Table
             return null;
         }
         
-        return "CREATE EXTENSION IF NOT EXISTS citext; ALTER TABLE " . $this->quote($tableName) . " " . implode(", ", $alterStatements) . ";";
+        $extensionQuery = $usesCitext ? 'CREATE EXTENSION IF NOT EXISTS citext; ' : '';
+        return $extensionQuery . "ALTER TABLE " . $this->quote($tableName) . " " . implode(", ", $alterStatements) . ";";
     }
     
     private function build_using_clause(string $columnName, string $targetType, string $existingType, bool $isNullable=true): string
@@ -332,17 +342,13 @@ class PostgreSQL_Table
             'int' => 'BIGINT',
             'float' => 'DOUBLE PRECISION',
             'bool' => 'BOOLEAN',
-            'string' => 'CITEXT',
-            default => 'CITEXT',
+            'string' => 'TEXT',
+            default => 'TEXT',
         };
     }
     
     private function normalize_type_from_attribute(Type $type, ?string $maxLength): string
     {
-        // Use case-insensitive text so SELECT comparisons ignore letter casing.
-        if ($type === Type::TEXT)
-            return 'CITEXT';
-        
         return strtoupper($type->value);
     }
     

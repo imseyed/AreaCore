@@ -23,6 +23,7 @@ enum Type: string {
     case VARCHAR = 'varchar';
     case CHAR = 'char';
     case TEXT = 'text';
+    case CITEXT = 'citext';
     case DATE = 'date';
     case TIME = 'time';
     case TIMESTAMP = 'timestamp';
