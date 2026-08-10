@@ -4,6 +4,7 @@ namespace AreaCore\ORM\PostgreSQL;
 
 use ORM\PostgreSQL\Index;
 use ORM\PostgreSQL\Length;
+use ORM\PostgreSQL\NoCase;
 use ORM\PostgreSQL\PDO_SQL;
 use ORM\PostgreSQL\Type;
 use ORM\PostgreSQL\Unique;
@@ -287,16 +288,20 @@ class PostgreSQL_Table
         foreach ($this->indexes as $key => $val) {
             $cols = (array)$val;
             $indexName = is_int($key) ? 'idx_' . strtolower($this->table . '_' . implode('_', $cols)) : strtolower((string)$key);
-            $normalizedIndexes[$indexName] = array_map('strtolower', array_values($cols));
+            $columns = array_values($cols);
+            $normalizedIndexes[$indexName] = [
+                'columns' => $columns,
+                'normalizedColumns' => array_map(fn($column) => $this->normalize_index_expression($this->index_expression((string)$column)), $columns),
+            ];
         }
         
         $query = '';
         
         foreach ($existingIndexes as $existingName => $existingCols) {
-            $existingColsLower = array_map('strtolower', $existingCols);
+            $existingColsLower = array_map(fn($column) => $this->normalize_index_expression($column), $existingCols);
             $found = false;
-            foreach ($normalizedIndexes as $normCols) {
-                if ($existingColsLower === $normCols) {
+            foreach ($normalizedIndexes as $indexData) {
+                if ($existingColsLower === $indexData['normalizedColumns']) {
                     $found = true;
                     break;
                 }
@@ -306,18 +311,19 @@ class PostgreSQL_Table
             }
         }
         
-        foreach ($normalizedIndexes as $indexName => $columns) {
-            $columnsNormalized = array_map('strtolower', $columns);
+        foreach ($normalizedIndexes as $indexName => $indexData) {
+            $columns = $indexData['columns'];
+            $columnsNormalized = $indexData['normalizedColumns'];
             $found = false;
             foreach ($existingIndexes as $existingCols) {
-                $existingColsNormalized = array_map('strtolower', $existingCols);
+                $existingColsNormalized = array_map(fn($column) => $this->normalize_index_expression($column), $existingCols);
                 if ($existingColsNormalized === $columnsNormalized) {
                     $found = true;
                     break;
                 }
             }
             if (!$found) {
-                $cols = implode(',', array_map(fn($col) => $this->quote($col), $columns));
+                $cols = implode(',', array_map(fn($column) => $this->index_expression((string)$column), $columns));
                 $query .= "CREATE INDEX " . $this->quote($indexName) . " ON " . $this->quote($tableName) . " ($cols);\n";
             }
         }
@@ -368,6 +374,17 @@ class PostgreSQL_Table
     {
         return $this->table . '_' . $column . '_key';
     }
+
+    private function index_expression(string $column): string
+    {
+        $quotedColumn = $this->quote($column);
+        return self::is_no_case_property($this->calledClass, $column) ? "LOWER($quotedColumn)" : $quotedColumn;
+    }
+
+    private function normalize_index_expression(string $expression): string
+    {
+        return preg_replace('/\s+/', '', strtolower(str_replace('"', '', trim($expression))));
+    }
     
     private function quote(string $identifier): string
     {
@@ -386,6 +403,9 @@ class PostgreSQL_Table
     
     static function is_boolean_property($className, $property): bool
     {
+        if ($className === '' || !class_exists($className)) {
+            return false;
+        }
         $reflection = new ReflectionClass($className);
         if (!$reflection->hasProperty($property))
             return false;
@@ -402,6 +422,15 @@ class PostgreSQL_Table
                 return true;
         }
         return false;
+    }
+
+    static function is_no_case_property(string $className, string $property): bool
+    {
+        if ($className === '' || !class_exists($className)) {
+            return false;
+        }
+        $reflection = new ReflectionClass($className);
+        return $reflection->hasProperty($property) && !empty($reflection->getProperty($property)->getAttributes(NoCase::class));
     }
     
     static function normalize_table_name(string $tableName): string

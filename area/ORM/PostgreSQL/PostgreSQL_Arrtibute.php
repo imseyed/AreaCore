@@ -12,6 +12,9 @@ class Index {}
 #[Attribute]
 class Unique {}
 
+#[Attribute(Attribute::TARGET_PROPERTY)]
+class NoCase {}
+
 enum Type: string {
     case BOOL = 'boolean';
     case SMALLINT = 'smallint';

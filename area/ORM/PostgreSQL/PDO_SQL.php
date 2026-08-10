@@ -227,13 +227,12 @@ class PDO_SQL
                 CASE WHEN ix.indisunique THEN 0 ELSE 1 END AS \"Non_unique\",
                 i.relname AS \"Key_name\",
                 ord.pos AS \"Seq_in_index\",
-                a.attname AS \"Column_name\"
+                pg_get_indexdef(ix.indexrelid, ord.pos, true) AS \"Column_name\"
             FROM pg_class t
             JOIN pg_namespace ns ON ns.oid = t.relnamespace
             JOIN pg_index ix ON t.oid = ix.indrelid
             JOIN pg_class i ON i.oid = ix.indexrelid
             JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY ord(attnum, pos) ON true
-            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ord.attnum
             WHERE t.relname = :table_name
               AND ns.nspname = current_schema()
               AND ix.indisprimary = false

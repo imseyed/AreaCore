@@ -269,19 +269,20 @@ class PostgreSQL_Data
             }
             
             if (preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $item)) {
-                $q = $this->quote($item);
+                $q = $this->condition_column_expression($item);
+                $valueExpression = $this->condition_value_expression($item);
                 if ($value === '') {
                     if (PostgreSQL_Table::is_boolean_property($this->calledClass, $item)) // اگر بولین هست به صورت رشته خالی چک نشه
                         $query .= "$q IS NULL AND ";
                     else
                         $query .= "($q = '' OR $q IS NULL) AND ";
                 } elseif(is_array($value) && count($value) > 0) {
-                    $query .= "$q IN (".implode(", ", (array_fill(0, count($value), "?"))).") AND ";
+                    $query .= "$q IN (".implode(", ", (array_fill(0, count($value), $valueExpression))).") AND ";
                     foreach ($value as $v) {
                         $this->executes[] = $v;
                     }
                 }else{
-                    $query .= "$q = ? AND ";
+                    $query .= "$q = $valueExpression AND ";
                     if (PostgreSQL_Table::is_boolean_property($this->calledClass, $item) && is_bool($value))
                         $value = $value ? "t" : "f";
                     $this->executes[] = $value;
@@ -293,7 +294,7 @@ class PostgreSQL_Data
             
             if (str_ends_with($item, '==')) {
                 $item = str_replace('=', '', $item);
-                $query .= $this->quote($item) . " = ? AND ";
+                $query .= $this->condition_column_expression($item) . " = " . $this->condition_value_expression($item) . " AND ";
                 $this->executes[] = $value;
             } elseif (str_ends_with($item, '>=#')) {
                 $item = str_replace('>=#', '', $item);
@@ -313,27 +314,27 @@ class PostgreSQL_Data
                 $this->executes[] = $value;
             } elseif (str_ends_with($item, '>=')) {
                 $item = str_replace('>=', '', $item);
-                $query .= $this->quote($item) . " >= ? AND ";
+                $query .= $this->condition_column_expression($item) . " >= " . $this->condition_value_expression($item) . " AND ";
                 $this->executes[] = $value;
             } elseif (str_ends_with($item, '<=')) {
                 $item = str_replace('<=', '', $item);
-                $query .= $this->quote($item) . " <= ? AND ";
+                $query .= $this->condition_column_expression($item) . " <= " . $this->condition_value_expression($item) . " AND ";
                 $this->executes[] = $value;
             } elseif (str_ends_with($item, '>')) {
                 $item = str_replace('>', '', $item);
-                $query .= $this->quote($item) . " > ? AND ";
+                $query .= $this->condition_column_expression($item) . " > " . $this->condition_value_expression($item) . " AND ";
                 $this->executes[] = $value;
             } elseif (str_ends_with($item, '<')) {
                 $item = str_replace('<', '', $item);
-                $query .= $this->quote($item) . " < ? AND ";
+                $query .= $this->condition_column_expression($item) . " < " . $this->condition_value_expression($item) . " AND ";
                 $this->executes[] = $value;
             } elseif (str_ends_with($item, '!=')) {
                 $item = str_replace('!=', '', $item);
-                $query .= $this->quote($item) . " <> ? AND ";
+                $query .= $this->condition_column_expression($item) . " <> " . $this->condition_value_expression($item) . " AND ";
                 $this->executes[] = $value;
             } elseif (str_starts_with($item, '*') || str_ends_with($item, '*')) {
                 $searchItem = str_replace('*', '', $item);
-                $query .= $this->quote($searchItem) . " LIKE ? ESCAPE '\\' AND ";
+                $query .= $this->condition_column_expression($searchItem) . " LIKE " . $this->condition_value_expression($searchItem) . " ESCAPE '\\' AND ";
                 
                 $value = str_replace(
                     ['\\', '%', '_'],
@@ -497,5 +498,16 @@ class PostgreSQL_Data
     private function quote(string $identifier): string
     {
         return PDO_SQL::quote($identifier);
+    }
+
+    private function condition_column_expression(string $column): string
+    {
+        $quotedColumn = $this->quote($column);
+        return PostgreSQL_Table::is_no_case_property($this->calledClass, $column) ? "LOWER($quotedColumn)" : $quotedColumn;
+    }
+
+    private function condition_value_expression(string $column): string
+    {
+        return PostgreSQL_Table::is_no_case_property($this->calledClass, $column) ? 'LOWER(?)' : '?';
     }
 }
