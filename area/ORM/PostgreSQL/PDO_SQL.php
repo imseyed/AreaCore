@@ -227,7 +227,7 @@ class PDO_SQL
                 CASE WHEN ix.indisunique THEN 0 ELSE 1 END AS \"Non_unique\",
                 i.relname AS \"Key_name\",
                 ord.pos AS \"Seq_in_index\",
-                pg_get_indexdef(ix.indexrelid, ord.pos, true) AS \"Column_name\"
+                pg_get_indexdef(ix.indexrelid, ord.pos::integer, true) AS \"Column_name\"
             FROM pg_class t
             JOIN pg_namespace ns ON ns.oid = t.relnamespace
             JOIN pg_index ix ON t.oid = ix.indrelid
