@@ -160,13 +160,13 @@ Router::get('/cron/backup')->page('cron/db/backup');
 You can define reusable constants for use in routes and views.
 
 ```php
-Router::define('adminBase', '/admin/dashboard');
+Router::define('adminPanel', '/admin/dashboard');
 ```
 
 #### Usage in route definition:
 
 ```php
-Router::get('[adminBase]/settings')->page('admin/settings.php');
+Router::get('[adminPanel]/settings')->page('admin/settings.php');
 ```
 
 #### Usage in views / HTML:
@@ -176,6 +176,29 @@ Router::get('[adminBase]/settings')->page('admin/settings.php');
 ```
 
 The `Router::prefix()` method returns the constant value for use in links.
+
+### 4.1 Defining Shortcuts for Folders and Files
+
+`Router::define()` can also be used to create reusable shortcuts for folder paths and file paths. This is useful for avoiding repeated long paths in route definitions.
+
+#### Example
+
+```php
+Router::define(':api', "web/api");
+```
+
+The `:api` alias can then be used wherever the corresponding path is required.
+
+For example:
+
+```php
+Router::get("[userAPI]/setting/update/check")
+    ->page(":api/setting/update/setting-update-check.php");
+```
+
+Here, `:api` is replaced by the path defined with `Router::define()`: `web/api/setting/update/setting-update-check.php`.
+
+This makes route definitions shorter, easier to read, and easier to maintain when the underlying directory structure changes.
 
 ---
 
@@ -197,7 +220,7 @@ Router::get('/blog/{id}')->page('blog/blog-show.php');
 
 > * files run using `include()` from folder `/view`. if you want to call from another root directory you can use `../anotherFolder`
 > * Write files extension are optional when is `.php`
-> * if action file not found, that close process and return string status. if you want to show specific error message must define function `router_file_not_found` 
+> * if action file not found, that close process and return string status. if you want to show specific error message must define function `router_file_not_found`
 
 
 **Static method:**

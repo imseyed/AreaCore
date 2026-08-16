@@ -370,6 +370,14 @@ Loads data and optionally queries database.
 $user->set(username: "ali")->reverse();
 ```
 
+> Note: Use `Model::get()` when you want a list of records.
+> It returns a two-dimensional array of matched rows.
+> Use `$model->set(...)` when you need a single object populated from the database using the specified query conditions.
+> In other words, `set()` hydrates an object from the existing row data. If more than one row matches the query,
+> the ORM picks the record with the lowest ID.
+> In model classes that use `use ORM\...`, the default `__construct()` behaves like `set()`,
+> so it effectively hydrates the object using the same database-based initialization logic.
+
 ---
 
 ## 🆔 `->set_byID()`
