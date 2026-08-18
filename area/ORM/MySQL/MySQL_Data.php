@@ -208,10 +208,16 @@ class MySQL_Data
                     if ($value === '')
                         $query .= "(`$item` = '' OR `$item` IS NULL) AND ";
                     elseif(is_array($value) && count($value) > 0) {
-                        $query .= "`$item` IN (".implode(", ", (array_fill(0, count($value), "?"))).") AND ";
+                        $thisQuery = "`$item` IN (".implode(", ", (array_fill(0, count($value), "?"))).") AND ";
                         foreach ($value as $v) {
                             $this->executes[] = $v;
                         }
+                        if (in_array('', $value)){
+                            $thisQuery = substr($thisQuery, 0, -4); // Remove `AND `
+                            $query .= "($thisQuery OR $item IS NULL)";
+                        }
+                        else
+                            $query .= $thisQuery;
                     }else{
                         $query .= "`$item` = ? AND ";
                         $this->executes[] = $value;
@@ -258,8 +264,22 @@ class MySQL_Data
                         $this->executes[] = $value;
                     } elseif (str_ends_with($item, '!=')) {
                         $item = str_replace('!=', '', $item);
-                        $query .= "`$item` <> ? AND ";
-                        $this->executes[] = $value;
+                        if (is_array($value) && count($value) > 0) { // not in list: NOT IN (A, B)
+                            $thisQuery = "`$item` NOT IN (".implode(", ", (array_fill(0, count($value), "?"))).") AND ";
+                            foreach ($value as $v) {
+                                $this->executes[] = $v;
+                            }
+                            if (!in_array('', $value)){
+                                $thisQuery = substr($thisQuery, 0, -4); // Remove `AND `
+                                $query .= "($thisQuery OR `$item` IS NULL)";
+                            }
+                            else
+                                $query .= $thisQuery;
+                        }else{ // not equal: <> 'value'
+                            $query .= "`$item` <> ? AND ";
+                            $this->executes[] = $value;
+                        }
+                        var_dump($this->executes);
                     } elseif (str_starts_with($item, '*') || str_ends_with($item, '*')) { // Like search
                         $searchItem = str_replace('*', '', $item);
                         $query .= "`$searchItem` LIKE ? AND ";

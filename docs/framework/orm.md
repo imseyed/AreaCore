@@ -100,6 +100,7 @@ User::get()->has('name')->do;
 Returns rows where a column is empty.
 
 > NULL and empty string are treated the same.
+> Note: the ORM treats '' (empty string) and NULL interchangeably in conditions; `->null()` will match both values.
 
 ```php
 User::get()->null('name')->do;
@@ -132,7 +133,7 @@ User::get(['age>' => 18])->do;
 ## 📊 Supported Operators
 
 | Operator           | Description                     |              |
-| ------------------ | ------------------------------- | ------------ |
+| ------------------ |---------------------------------| ------------ |
 | `^`                | Neutral / no-op                 |              |
 | `~`                | Reverse order                   |              |
 | `@INT@INT@`        | Range selection (start → count) |              |
@@ -141,8 +142,9 @@ User::get(['age>' => 18])->do;
 | `                  | `                               | OR condition |
 | `==`               | Equal (default if omitted)      |              |
 | `>=, <=, >, <`     | Numeric comparison              |              |
-| `>=#, <=#, >#, <#` | String comparison               |              |
+| `>=#, <=#, >#, <#` | Casting comparison              |              |
 | `*`                | LIKE / pattern match            |              |
+Note: Operators suffixed with `#` (for example `>#`, `<#`) force a numeric cast before comparison. This is useful when a column is defined as a string (VARCHAR) but contains numeric values — the ORM converts values to numbers for the comparison.
 
 ---
 
@@ -546,6 +548,10 @@ User::table()->index('title')->update();
 User::table()->index(['title', 'author'])->update();
 ```
 
+## 🔗 Foreign keys
+
+This ORM intentionally does not create or enforce database-level foreign key constraints. The operational cost — extra complexity during migrations, potential cascading side effects, and added locking — often outweighs the benefits for this project's workflows. Manage relationships at the application level using model associations and controlled delete/update logic instead.
+"The juice isn't worth the squeeze."
 ---
 
 Here is your requested **Section 8 - How to Use ORM** added in a clean, consistent, and polished style matching your documentation:

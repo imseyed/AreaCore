@@ -35,7 +35,7 @@ class Length {
     public Type $type;
     public ?string $maxLength;
     
-    public function __construct(Type $type = Type::VARCHAR, ?int $maxLength = 255, int $decimal = null) {
+    public function __construct(Type $type = Type::VARCHAR, ?int $maxLength = 255, ?int $decimal = null) {
         $this->type = $type;
         $this->maxLength = $maxLength;
         if ($type === Type::DECIMAL && $maxLength !== null && $decimal !== null)

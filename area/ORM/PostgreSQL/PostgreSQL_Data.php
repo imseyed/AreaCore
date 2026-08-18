@@ -277,10 +277,16 @@ class PostgreSQL_Data
                     else
                         $query .= "($q = '' OR $q IS NULL) AND ";
                 } elseif(is_array($value) && count($value) > 0) {
-                    $query .= "$q IN (".implode(", ", (array_fill(0, count($value), $valueExpression))).") AND ";
+                    $thisQuery = "$q IN (".implode(", ", (array_fill(0, count($value), $valueExpression))).") AND ";
                     foreach ($value as $v) {
                         $this->executes[] = $v;
                     }
+                    if (in_array('', $value)){
+                        $thisQuery = substr($thisQuery, 0, -4); // Remove `AND `
+                        $query .= "($thisQuery OR $q IS NULL)";
+                    }
+                    else
+                        $query .= $thisQuery;
                 }else{
                     $query .= "$q = $valueExpression AND ";
                     if (PostgreSQL_Table::is_boolean_property($this->calledClass, $item) && is_bool($value))
@@ -290,25 +296,28 @@ class PostgreSQL_Data
                 continue;
             }
             
-            $decimalDigitsCount = (str_contains((string)$value, '.') ? strlen((string)$value) - strpos((string)$value, '.') - 1 : 0);
             
             if (str_ends_with($item, '==')) {
                 $item = str_replace('=', '', $item);
                 $query .= $this->condition_column_expression($item) . " = " . $this->condition_value_expression($item) . " AND ";
                 $this->executes[] = $value;
             } elseif (str_ends_with($item, '>=#')) {
+                $decimalDigitsCount = (str_contains((string)$value, '.') ? strlen((string)$value) - strpos((string)$value, '.') - 1 : 0);
                 $item = str_replace('>=#', '', $item);
                 $query .= "CAST(" . $this->quote($item) . " AS DECIMAL(10, " . $decimalDigitsCount . ")) >= ? AND ";
                 $this->executes[] = $value;
             } elseif (str_ends_with($item, '<=#')) {
+                $decimalDigitsCount = (str_contains((string)$value, '.') ? strlen((string)$value) - strpos((string)$value, '.') - 1 : 0);
                 $item = str_replace('<=#', '', $item);
                 $query .= "CAST(" . $this->quote($item) . " AS DECIMAL(10, " . $decimalDigitsCount . ")) <= ? AND ";
                 $this->executes[] = $value;
             } elseif (str_ends_with($item, '>#')) {
+                $decimalDigitsCount = (str_contains((string)$value, '.') ? strlen((string)$value) - strpos((string)$value, '.') - 1 : 0);
                 $item = str_replace('>#', '', $item);
                 $query .= "CAST(" . $this->quote($item) . " AS DECIMAL(10, " . $decimalDigitsCount . ")) > ? AND ";
                 $this->executes[] = $value;
             } elseif (str_ends_with($item, '<#')) {
+                $decimalDigitsCount = (str_contains((string)$value, '.') ? strlen((string)$value) - strpos((string)$value, '.') - 1 : 0);
                 $item = str_replace('<#', '', $item);
                 $query .= "CAST(" . $this->quote($item) . " AS DECIMAL(10, " . $decimalDigitsCount . ")) < ? AND ";
                 $this->executes[] = $value;
@@ -330,8 +339,22 @@ class PostgreSQL_Data
                 $this->executes[] = $value;
             } elseif (str_ends_with($item, '!=')) {
                 $item = str_replace('!=', '', $item);
-                $query .= $this->condition_column_expression($item) . " <> " . $this->condition_value_expression($item) . " AND ";
-                $this->executes[] = $value;
+                if (is_array($value) && count($value) > 0) { // not in list: NOT IN (A, B)
+                    $thisQuery = $this->condition_column_expression($item)." NOT IN (".implode(", ", (array_fill(0, count($value), $this->condition_value_expression($item)))).") AND ";
+                    foreach ($value as $v) {
+                        $this->executes[] = $v;
+                    }
+                    if (!in_array('', $value)){
+                        $thisQuery = substr($thisQuery, 0, -4); // Remove `AND `
+                        $query .= "($thisQuery OR {$this->condition_column_expression($item)} IS NULL)";
+                    }
+                    else
+                        $query .= $thisQuery;
+                }else{ // not equal: <> 'value'
+                    $query .= $this->condition_column_expression($item) . " <> " . $this->condition_value_expression($item) . " AND ";
+                    $this->executes[] = $value;
+                }
+                var_dump($this->executes);
             } elseif (str_starts_with($item, '*') || str_ends_with($item, '*')) {
                 $searchItem = str_replace('*', '', $item);
                 $query .= $this->condition_column_expression($searchItem) . " LIKE " . $this->condition_value_expression($searchItem) . " ESCAPE '\\' AND ";
@@ -499,13 +522,13 @@ class PostgreSQL_Data
     {
         return PDO_SQL::quote($identifier);
     }
-
+    
     private function condition_column_expression(string $column): string
     {
         $quotedColumn = $this->quote($column);
         return PostgreSQL_Table::is_no_case_property($this->calledClass, $column) ? "LOWER($quotedColumn)" : $quotedColumn;
     }
-
+    
     private function condition_value_expression(string $column): string
     {
         return PostgreSQL_Table::is_no_case_property($this->calledClass, $column) ? 'LOWER(?)' : '?';
