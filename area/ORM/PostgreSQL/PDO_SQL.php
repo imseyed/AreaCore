@@ -27,6 +27,7 @@ class PDO_SQL
     {
         if (empty(@$config['dbname'])) {
             self::$error .= "Database name is not set!" . EOL;
+            // But don't throw any exception because may create db now
         }
         $mode = strtolower((string)(@$config['mode'] ?? ''));
         if (in_array($mode, ['postgresql', 'postgres'], true)) {
@@ -43,6 +44,88 @@ class PDO_SQL
         $config['mode'] = 'pgsql';
         self::$config = $config;
         return true;
+    }
+
+    /**
+     * Create a PostgreSQL database using all CREATE DATABASE options.
+     */
+    public static function create_database(string $database, ?string $owner = null, ?string $template = null, ?string $encoding = null, ?string $lcCollate = null, ?string $lcCtype = null, ?string $tablespace = null, ?bool $allowConnections = null, ?int $connectionLimit = null, ?bool $isTemplate = null, bool $ifNotExists = true): bool {
+        $config = self::$config;
+        $hostname = $config['hostname'] ?? '';
+        $port = $config['port'] ?? 5432;
+        $username = $config['username'] ?? '';
+        $password = $config['password'] ?? '';
+
+        try {
+            // Connect to the default administrative database, not the database
+            // being created (which may not exist yet).
+            $dsn = "pgsql:host=$hostname;port=$port;dbname=postgres";
+            $connection = new PDO($dsn, $username, $password, self::$BUFFER_CONFIG);
+
+            if ($ifNotExists) {
+                $statement = $connection->prepare('SELECT 1 FROM pg_database WHERE datname = :database');
+                $statement->execute([':database' => $database]);
+                if ($statement->fetchColumn() !== false) {
+                    return true;
+                }
+            }
+
+            $query = 'CREATE DATABASE ' . self::quote($database);
+            if ($owner !== null) {
+                $query .= ' OWNER ' . self::quote($owner);
+            }
+            if ($template !== null) {
+                $query .= ' TEMPLATE ' . self::quote($template);
+            }
+            if ($encoding !== null) {
+                $query .= ' ENCODING ' . $connection->quote($encoding);
+            }
+            if ($lcCollate !== null) {
+                $query .= ' LC_COLLATE ' . $connection->quote($lcCollate);
+            }
+            if ($lcCtype !== null) {
+                $query .= ' LC_CTYPE ' . $connection->quote($lcCtype);
+            }
+            if ($tablespace !== null) {
+                $query .= ' TABLESPACE ' . self::quote($tablespace);
+            }
+            if ($allowConnections !== null) {
+                $query .= ' ALLOW_CONNECTIONS ' . ($allowConnections ? 'true' : 'false');
+            }
+            if ($connectionLimit !== null) {
+                $query .= ' CONNECTION LIMIT ' . $connectionLimit;
+            }
+            if ($isTemplate !== null) {
+                $query .= ' IS_TEMPLATE ' . ($isTemplate ? 'true' : 'false');
+            }
+
+            $connection->exec($query);
+            return true;
+        } catch (PDOException|Exception $e) {
+            self::$error .= $e->getMessage() . EOL;
+            return false;
+        }
+    }
+
+    public static function create_extension(string $extension, ?string $schema = null, ?string $version = null, bool $cascade = false): bool {
+        try {
+            new self();
+            if (!self::$connection)
+                return false;
+            
+            $query = 'CREATE EXTENSION IF NOT EXISTS ' . self::quote($extension);
+            if ($schema !== null)
+                $query .= ' SCHEMA ' . self::quote($schema);
+            if ($version !== null)
+                $query .= ' VERSION ' . self::$connection->quote($version);
+            if ($cascade)
+                $query .= ' CASCADE';
+            self::$connection->exec($query);
+            return true;
+        } catch (PDOException|Exception $e) {
+            self::$error .= $e->getMessage() . EOL;
+            return false;
+        }
     }
     
     public static function quote(string $identifier): string
@@ -69,7 +152,7 @@ class PDO_SQL
         $port = $config['port'] ?: 5432;
         $username = $config['username'];
         $password = $config['password'];
-        $dbname = $config['dbname'] ?? "";
+        $dbname = trim((string)($config['dbname'] ?? '')) ?: 'postgres';
         $timeout = $config['timeout'] ?? null;
         
         try {

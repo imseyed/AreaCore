@@ -354,10 +354,9 @@ class PostgreSQL_Data
                     $query .= $this->condition_column_expression($item) . " <> " . $this->condition_value_expression($item) . " AND ";
                     $this->executes[] = $value;
                 }
-                var_dump($this->executes);
             } elseif (str_starts_with($item, '*') || str_ends_with($item, '*')) {
                 $searchItem = str_replace('*', '', $item);
-                $query .= $this->condition_column_expression($searchItem) . " LIKE " . $this->condition_value_expression($searchItem) . " ESCAPE '\\' AND ";
+                $query .= $this->condition_column_expression($searchItem) . " LIKE " . $this->condition_value_expression($searchItem) . " AND ";
                 
                 $value = str_replace(
                     ['\\', '%', '_'],

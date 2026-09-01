@@ -57,6 +57,35 @@ class PDO_SQL
         self::$config = $config;
         return true;
     }
+
+    /**
+     * Create a database without requiring the configured database to exist.
+     */
+    public static function create_database(string $database, string $charset = 'utf8mb4', string $collate = 'utf8mb4_unicode_ci'): bool {
+        $config = self::$config;
+        $hostname = $config['hostname'] ?? '';
+        $port = $config['port'] ?? 3306;
+        $username = $config['username'] ?? '';
+        $password = $config['password'] ?? '';
+
+        try {
+            $dsn = "mysql:host=$hostname;port=$port;charset=$charset";
+            $connection = new PDO($dsn, $username, $password, self::$BUFFER_CONFIG);
+            $query = 'CREATE DATABASE IF NOT EXISTS ' . self::quote_identifier($database)
+                . ' CHARACTER SET ' . self::quote_identifier($charset)
+                . ' COLLATE ' . self::quote_identifier($collate);
+            $connection->exec($query);
+            return true;
+        } catch (PDOException|Exception $e) {
+            self::$error .= $e->getMessage() . EOL;
+            return false;
+        }
+    }
+
+    private static function quote_identifier(string $identifier): string
+    {
+        return '`' . str_replace('`', '``', $identifier) . '`';
+    }
     
     public function __construct($noBuffer = false)
     {

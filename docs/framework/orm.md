@@ -20,6 +20,112 @@ The ORM is designed around a **chainable method system** that allows expressive 
 
 ---
 
+# Database Management
+
+Database creation is available through the driver-specific `PDO_SQL` classes. The
+database configuration must be initialized before calling these methods. The
+configured user must have permission to create databases.
+
+## MySQL
+
+Use `ORM\MySQL\PDO_SQL::create_database()`. The database name, character set,
+and collation can be specified. The default values are `utf8mb4` and
+`utf8mb4_unicode_ci`.
+
+```php
+use ORM\MySQL\PDO_SQL;
+
+PDO_SQL::create_database('areacore');
+
+// Custom character set and collation
+PDO_SQL::create_database('areacore', 'utf8mb4', 'utf8mb4_bin');
+```
+
+Signature:
+
+```php
+PDO_SQL::create_database(
+    string $database,
+    string $charset = 'utf8mb4',
+    string $collate = 'utf8mb4_unicode_ci'
+): bool;
+```
+
+The method uses `CREATE DATABASE IF NOT EXISTS`, so calling it for an existing
+database does not produce an error.
+
+## PostgreSQL
+
+Use `ORM\PostgreSQL\PDO_SQL::create_database()`. PostgreSQL supports all
+database creation options:
+
+```php
+use ORM\PostgreSQL\PDO_SQL;
+
+PDO_SQL::create_database(
+    database: 'areacore',
+    owner: 'postgres',
+    template: 'template0',
+    encoding: 'UTF8',
+    lcCollate: 'en_US.UTF-8',
+    lcCtype: 'en_US.UTF-8',
+    tablespace: 'pg_default',
+    allowConnections: true,
+    connectionLimit: 100,
+    isTemplate: false
+);
+```
+
+Signature:
+
+```php
+PDO_SQL::create_database(
+    string $database,
+    ?string $owner = null,
+    ?string $template = null,
+    ?string $encoding = null,
+    ?string $lcCollate = null,
+    ?string $lcCtype = null,
+    ?string $tablespace = null,
+    ?bool $allowConnections = null,
+    ?int $connectionLimit = null,
+    ?bool $isTemplate = null,
+    bool $ifNotExists = true
+): bool;
+```
+
+The method connects to the administrative `postgres` database while creating
+the new database. When `$ifNotExists` is `true`, an existing database is
+silently accepted.
+
+### PostgreSQL Extensions
+
+Extensions are enabled in the currently configured PostgreSQL database with
+`create_extension()`:
+
+```php
+PDO_SQL::create_extension('citext');
+
+// With optional schema, version, and CASCADE
+PDO_SQL::create_extension('postgis', 'public', null, true);
+```
+
+Signature:
+
+```php
+PDO_SQL::create_extension(
+    string $extension,
+    ?string $schema = null,
+    ?string $version = null,
+    bool $cascade = false
+): bool;
+```
+
+Both methods return `true` on success and `false` on failure. The error message
+is stored in `PDO_SQL::$error`.
+
+---
+
 # 📥 1. Data Retrieval
 
 ## 🔹 `::get()`
