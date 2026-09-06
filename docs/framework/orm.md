@@ -613,6 +613,60 @@ When `#[NoCase]` and `#[Index]` are both present, the PostgreSQL ORM creates an 
 User::table()->create();
 ```
 
+### Table creation options
+
+Use `->option(array $options)` to configure options that are specific to the
+active database driver. Options affect `CREATE TABLE`; they are not migration
+operations for an existing table. Calling `option()` more than once merges the
+provided arrays.
+
+#### PostgreSQL
+
+PostgreSQL supports `temporary`, `unlogged`, `tablespace`, and
+`storage_parameters`. `temporary` and `unlogged` are mutually exclusive.
+
+```php
+User::table()->option(['unlogged' => true])->create();
+
+Session::table()->option([
+    'temporary' => true,
+])->create();
+
+Event::table()->option([
+    'storage_parameters' => [
+        'fillfactor' => 70,
+        'autovacuum_enabled' => true,
+    ],
+    'tablespace' => 'fast_space',
+])->create();
+```
+
+The first example generates `CREATE UNLOGGED TABLE`; the second generates
+`CREATE TEMPORARY TABLE`. Storage parameter names must be valid PostgreSQL
+identifiers and their values are emitted as SQL literals.
+
+#### MySQL
+
+MySQL supports `engine`, `character_set`, `collate`, `row_format`,
+`key_block_size`, `compression`, `encryption`, `auto_increment`,
+`avg_row_length`, `max_rows`, `min_rows`, `pack_keys`, `checksum`,
+`delay_key_write`, and `comment`.
+
+```php
+Archive::table()->option([
+    'engine' => 'MyISAM',
+    'row_format' => 'DYNAMIC',
+    'character_set' => 'utf8mb4',
+    'collate' => 'utf8mb4_bin',
+    'comment' => 'Archived records',
+])->create();
+```
+
+The ORM keeps its default MySQL options (`InnoDB`, `utf8mb4`, and
+`utf8mb4_unicode_ci`) unless they are overridden. Numeric options must be
+non-negative integers, and identifier-like options are validated before SQL is
+generated.
+
 ---
 
 ### Update

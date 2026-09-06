@@ -49,6 +49,8 @@ trait PostgreSQL
     
     static function table(?string $tableName = null): PostgreSQL_Table
     {
+        if ($tableName)
+            $tableName = PostgreSQL_Table::normalize_table_name($tableName);
         $tableName ??= self::this_class_table();
         $properties = self::properties();
         return new PostgreSQL_Table($tableName, $properties, get_called_class());
@@ -146,6 +148,8 @@ trait PostgreSQL
     
     public function save(?string $table = null, bool $newRow = false): bool|int
     {
+        if ($table)
+            $table = PostgreSQL_Table::normalize_table_name($table);
         $table ??= self::this_class_table();
         $vars = $this->get_vars(false);
         if (@$vars['ID'] && !$newRow) {

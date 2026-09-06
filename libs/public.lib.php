@@ -445,7 +445,8 @@ function get_form_data(string $method = "post"): array
 function get_form_data_html(string $method = "post"): array
 {
     $data = file_get_contents("php://input");
-    parse_str($data, $parsed);
+    $parsed = [];
+    parse_raw_body($data, $parsed);
     
     return match (strtolower($method)){
         "get"=>$_GET,
@@ -457,6 +458,82 @@ function get_form_data_html(string $method = "post"): array
     };
 }
 
+/**
+ * Parses raw HTTP request body string into an associative array.
+ *
+ * Automatically detects and processes:
+ * - multipart/form-data (extracting boundary and form-data fields)
+ * - application/json
+ * - application/x-www-form-urlencoded (standard parse_str)
+ *
+ * @param string $raw The raw input body string (e.g. from php://input).
+ * @param array &$result The output array where parsed key-value pairs are stored.
+ * @return void
+ */
+function parse_raw_body(string $raw, array &$result): void
+{
+    $result = [];
+    
+    if ($raw === '') {
+        return;
+    }
+    
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? ($_SERVER['HTTP_CONTENT_TYPE'] ?? '');
+    
+    // 1) Handle multipart/form-data
+    if (stripos($contentType, 'multipart/form-data') !== false) {
+        if (!preg_match('/boundary=(?:"([^"]+)"|([^;\s]+))/i', $contentType, $matches)) {
+            return;
+        }
+        
+        $boundary = $matches[1] !== '' ? $matches[1] : $matches[2];
+        $parts    = explode('--' . $boundary, $raw);
+        
+        foreach ($parts as $part) {
+            $part = trim($part, "\r\n");
+            
+            if ($part === '' || $part === '--') {
+                continue;
+            }
+            
+            $splitPos = strpos($part, "\r\n\r\n");
+            if ($splitPos === false) {
+                continue;
+            }
+            
+            $headersRaw = substr($part, 0, $splitPos);
+            $body       = substr($part, $splitPos + 4);
+            $body       = preg_replace('/\r\n$/', '', $body) ?? $body;
+            
+            // Extract field name from Content-Disposition header
+            if (preg_match('/name="([^"]+)"/i', $headersRaw, $nameMatch)) {
+                $name = $nameMatch[1];
+                
+                // Handle PHP array notation: name="foo[]" or name="foo[bar]"
+                if (str_contains($name, '[')) {
+                    parse_str($name . '=' . urlencode($body), $nested);
+                    $result = array_replace_recursive($result, $nested);
+                } else {
+                    $result[$name] = $body;
+                }
+            }
+        }
+        
+        return;
+    }
+    
+    // 2) Handle application/json
+    if (stripos($contentType, 'application/json') !== false) {
+        $json = json_decode($raw, true);
+        if (is_array($json)) {
+            $result = $json;
+        }
+        return;
+    }
+    
+    // 3) Handle application/x-www-form-urlencoded (standard fallback)
+    parse_str($raw, $result);
+}
 
 /**
  * Convert an array to a JavaScript list with specified quoting marks.

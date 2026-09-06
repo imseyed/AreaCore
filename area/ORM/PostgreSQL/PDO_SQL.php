@@ -152,7 +152,7 @@ class PDO_SQL
         $port = $config['port'] ?: 5432;
         $username = $config['username'];
         $password = $config['password'];
-        $dbname = trim((string)($config['dbname'] ?? '')) ?: 'postgres';
+        $dbname = $config['dbname'] ?? "";
         $timeout = $config['timeout'] ?? null;
         
         try {

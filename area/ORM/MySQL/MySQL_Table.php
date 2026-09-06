@@ -12,6 +12,7 @@ class MySQL_Table
     private array $properties;
     private string $calledClass;
     private array $indexes = array();
+    private array $options = [];
     private bool $changeStructure = false;
     
     public function __construct(string $table, $properties, $calledClass = null)
@@ -38,6 +39,27 @@ class MySQL_Table
                 }
             }
         }
+        return $this;
+    }
+
+    /**
+     * Set CREATE TABLE options. Calling this method more than once merges the
+     * supplied options with the options already set on this table.
+     */
+    public function option(array $options): static
+    {
+        $allowed = [
+            'engine', 'auto_increment', 'avg_row_length', 'character_set',
+            'checksum', 'collate', 'comment', 'compression', 'delay_key_write',
+            'encryption', 'key_block_size', 'max_rows', 'min_rows',
+            'pack_keys', 'row_format',
+        ];
+        $unknown = array_diff(array_keys($options), $allowed);
+        if ($unknown) {
+            throw new \InvalidArgumentException('Unsupported MySQL table option: ' . reset($unknown));
+        }
+
+        $this->options = array_replace($this->options, $options);
         return $this;
     }
     
@@ -158,9 +180,61 @@ class MySQL_Table
             $query .= $columnDef . ",";
         }
         
-        $query .= "PRIMARY KEY (`ID`) USING BTREE ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+        $query .= "PRIMARY KEY (`ID`) USING BTREE )" . $this->table_options_sql() . ";";
         
         return $query;
+    }
+
+    private function table_options_sql(): string
+    {
+        $options = $this->options;
+        $sql = ' ENGINE=' . $this->option_identifier($options['engine'] ?? 'InnoDB');
+        $sql .= ' DEFAULT CHARSET=' . $this->option_identifier($options['character_set'] ?? 'utf8mb4');
+        $sql .= ' COLLATE=' . $this->option_identifier($options['collate'] ?? 'utf8mb4_unicode_ci');
+
+        $identifiers = ['compression', 'encryption', 'pack_keys', 'row_format', 'delay_key_write'];
+        foreach ($identifiers as $key) {
+            if (array_key_exists($key, $options)) {
+                $sql .= ' ' . strtoupper($key === 'character_set' ? 'CHARACTER SET' : str_replace('_', ' ', $key)) . '=' . $this->option_identifier($options[$key]);
+            }
+        }
+
+        foreach (['auto_increment', 'avg_row_length', 'key_block_size', 'max_rows', 'min_rows'] as $key) {
+            if (array_key_exists($key, $options)) {
+                $sql .= ' ' . strtoupper(str_replace('_', ' ', $key)) . '=' . $this->option_integer($options[$key]);
+            }
+        }
+        if (array_key_exists('checksum', $options)) {
+            $sql .= ' CHECKSUM=' . ($this->option_bool($options['checksum']) ? '1' : '0');
+        }
+        if (array_key_exists('comment', $options)) {
+            $sql .= " COMMENT='" . str_replace("'", "''", (string)$options['comment']) . "'";
+        }
+        return $sql;
+    }
+
+    private function option_identifier(mixed $value): string
+    {
+        if (!is_string($value) || !preg_match('/^[A-Za-z0-9_]+$/', $value)) {
+            throw new \InvalidArgumentException('MySQL table option must be a simple identifier.');
+        }
+        return $value;
+    }
+
+    private function option_integer(mixed $value): int
+    {
+        if (filter_var($value, FILTER_VALIDATE_INT) === false || (int)$value < 0) {
+            throw new \InvalidArgumentException('MySQL table option must be a non-negative integer.');
+        }
+        return (int)$value;
+    }
+
+    private function option_bool(mixed $value): bool
+    {
+        if (!is_bool($value) && !in_array($value, [0, 1, '0', '1'], true)) {
+            throw new \InvalidArgumentException('MySQL table option must be boolean.');
+        }
+        return $value === true || $value === 1 || $value === '1';
     }
     
     private function update_table_query(): ?string
