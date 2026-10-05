@@ -8,6 +8,7 @@ require_once "MySQL/MySQL_Data.php";
 require_once "MySQL/MySQL_Arrtibute.php";
 
 global $DB_Config;
-if (strtolower((string)($DB_Config['mode'] ?? '')) === 'mysql') {
+if (in_array(strtolower((string)($DB_Config['mode'] ?? '')), ['mysql', 'mariadb'])) {
+    $DB_Config['mode'] = "mysql";
     \ORM\MySQL\PDO_SQL::initial($DB_Config);
 }

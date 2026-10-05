@@ -445,6 +445,9 @@ function get_form_data(string $method = "post"): array
 function get_form_data_html(string $method = "post"): array
 {
     $data = file_get_contents("php://input");
+    if (str_contains(strtolower($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json'))
+        return json_decode($data, true) ?: [];
+    
     $parsed = [];
     parse_raw_body($data, $parsed);
     

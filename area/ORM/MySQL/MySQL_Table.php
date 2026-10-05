@@ -23,13 +23,12 @@ class MySQL_Table
         return $this;
     }
     
+    /**
+     * Each string defines a separate index; each array defines a composite index.
+     */
     public function index(...$columns): static
     {
-        if (is_array(@$columns[0]))
-            $columns = array_merge(...$columns);
-        
-        if (is_array($columns))
-            $this->indexes = $columns;
+        $this->indexes = $columns;
         $ref = new ReflectionClass($this->calledClass);
         foreach ($ref->getProperties() as $prop) {
             if (!empty($prop->getAttributes(Index::class))) {
@@ -366,6 +365,10 @@ class MySQL_Table
         
         // Get existing indexes
         $rows = PDO_SQL::table_indexes($tableName);
+        $columnTypes = [];
+        foreach (PDO_SQL::table_columns($tableName) as $column) {
+            $columnTypes[strtolower($column['Field'])] = strtolower($column['Type']);
+        }
         
         $existingIndexes = [];
         foreach ($rows as $row) {
@@ -387,7 +390,7 @@ class MySQL_Table
         foreach ($this->indexes as $key => $val) {
             $cols = (array)$val;
             $indexName = is_int($key) ? 'idx_' . implode('_', $cols) : $key;
-            $normalizedIndexes[$indexName] = array_map('strtolower', array_values($cols));
+            $normalizedIndexes[$indexName] = array_values($cols);
         }
         
         $query = '';
@@ -398,7 +401,7 @@ class MySQL_Table
             
             $found = false;
             foreach ($normalizedIndexes as $normCols) {
-                if ($existingColsLower === $normCols) {
+                if ($existingColsLower === array_map('strtolower', $normCols)) {
                     $found = true;
                     break;
                 }
@@ -423,8 +426,20 @@ class MySQL_Table
             }
             
             if (!$found) {
-                $cols = implode('`,`', $columns);
-                $query .= "ALTER TABLE `{$tableName}` ADD INDEX `$indexName` (`$cols`);\n";
+                // TEXT/BLOB indexes need a prefix. Budget for utf8mb4's four
+                // bytes per character within InnoDB's 3072-byte key limit.
+                $prefixLength = min(191, max(1, intdiv(3072, 4 * count($columns))));
+                $indexColumns = [];
+                foreach ($columns as $column) {
+                    $quotedColumn = '`' . str_replace('`', '``', $column) . '`';
+                    $type = $columnTypes[strtolower($column)] ?? '';
+                    if (preg_match('/^(tinytext|text|mediumtext|longtext|tinyblob|blob|mediumblob|longblob)\\b/', $type)) {
+                        $quotedColumn .= "({$prefixLength})";
+                    }
+                    $indexColumns[] = $quotedColumn;
+                }
+                $cols = implode(',', $indexColumns);
+                $query .= "ALTER TABLE `{$tableName}` ADD INDEX `$indexName` ($cols);\n";
             }
         }
         

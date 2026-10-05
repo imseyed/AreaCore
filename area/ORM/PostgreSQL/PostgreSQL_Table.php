@@ -28,15 +28,12 @@ class PostgreSQL_Table
         return $this;
     }
     
+    /**
+     * Each string defines a separate index; each array defines a composite index.
+     */
     public function index(...$columns): static
     {
-        if (is_array(@$columns[0])) {
-            $columns = array_merge(...$columns);
-        }
-        
-        if (is_array($columns)) {
-            $this->indexes = $columns;
-        }
+        $this->indexes = $columns;
         
         $ref = new ReflectionClass($this->calledClass);
         foreach ($ref->getProperties() as $prop) {

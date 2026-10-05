@@ -9,8 +9,7 @@ require_once "PostgreSQL/PostgreSQL_DataJson.php";
 require_once "PostgreSQL/PostgreSQL_Arrtibute.php";
 
 global $DB_Config;
-if (strtolower((string)($DB_Config['mode'] ?? '')) === 'pgsql'
-    || strtolower((string)($DB_Config['mode'] ?? '')) === 'postgresql'
-    || strtolower((string)($DB_Config['mode'] ?? '')) === 'postgres') {
+if (in_array(strtolower((string)($DB_Config['mode'] ?? '')), ['pgsql', 'postgresql', 'postgres'])){
+    $DB_Config['mode'] = "pgsql";
     \ORM\PostgreSQL\PDO_SQL::initial($DB_Config);
 }
