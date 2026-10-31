@@ -130,12 +130,18 @@ class MySQL_Data
                 $this->main_query($query, $this->con);
             }
             if ($this->notNULL){
-                foreach ($this->notNULL as $item)
-                    $query .= "`$item` != '' AND ";
+                foreach ($this->notNULL as $item) {
+                    $query .= $this->is_numeric_column((string)$item)
+                        ? "`$item` IS NOT NULL AND "
+                        : "`$item` != '' AND ";
+                }
             }
             if ($this->isNULL){
-                foreach ($this->isNULL as $item)
-                    $query .= "(`$item` IS NULL OR `$item` = '') AND ";
+                foreach ($this->isNULL as $item) {
+                    $query .= $this->is_numeric_column((string)$item)
+                        ? "`$item` IS NULL AND "
+                        : "(`$item` IS NULL OR `$item` = '') AND ";
+                }
             }
             if (str_ends_with($query, "AND "))
                 $query = substr($query, 0, -4);
@@ -206,7 +212,9 @@ class MySQL_Data
                 
                 if (preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $item)) {
                     if ($value === '')
-                        $query .= "(`$item` = '' OR `$item` IS NULL) AND ";
+                        $query .= $this->is_numeric_column($item)
+                            ? "`$item` IS NULL AND "
+                            : "(`$item` = '' OR `$item` IS NULL) AND ";
                     elseif(is_array($value) && count($value) > 0) {
                         $thisQuery = "`$item` IN (".implode(", ", (array_fill(0, count($value), "?"))).") AND ";
                         foreach ($value as $v) {
@@ -418,6 +426,32 @@ class MySQL_Data
         return null;
     }
     
+    private function is_numeric_column(string $column): bool
+    {
+        if ($column === 'ID') {
+            return true;
+        }
+        if ($this->calledClass === '' || !class_exists($this->calledClass)) {
+            return false;
+        }
+        $reflection = new \ReflectionClass($this->calledClass);
+        if (!$reflection->hasProperty($column)) {
+            return false;
+        }
+        $property = $reflection->getProperty($column);
+        $attributes = $property->getAttributes(Length::class);
+        // Length overrides the PHP property type; BOOL is stored as TINYINT(1).
+        if ($attributes) {
+            return in_array($attributes[0]->newInstance()->type, [
+                Type::BOOL, Type::INT, Type::INT_SIGNED, Type::BIGINT,
+                Type::BIGINT_SIGNED, Type::FLOAT, Type::DECIMAL,
+            ], true);
+        }
+        $type = $property->getType();
+        return $type instanceof \ReflectionNamedType
+            && in_array($type->getName(), ['int', 'float', 'bool'], true);
+    }
+
     public function __toString(): string
     {
         return $this->create_query();

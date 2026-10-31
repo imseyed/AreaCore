@@ -242,7 +242,7 @@ class MySQL_Table
         $vars = $this->properties;
         $reflection = new ReflectionClass($this->calledClass);
         
-        // گرفتن ستون‌های موجود از دیتابیس
+        // Collect existing columns
         $existingColumns = PDO_SQL::table_columns($tableName);
         
         
@@ -412,7 +412,7 @@ class MySQL_Table
             }
         }
         
-        // اضافه کردن ایندکس‌های جدید
+        // Add new indexes
         foreach ($normalizedIndexes as $indexName => $columns) {
             $columnsNormalized = array_map('strtolower', $columns);
             

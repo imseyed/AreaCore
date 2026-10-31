@@ -703,10 +703,77 @@ User::table("member")->delete();
 
 ### Indexing
 
+The `index()` method accepts one or more arguments. A string argument creates
+one index for that column. An array argument creates one composite index, and
+the column order is preserved.
+
+#### Separate indexes
+
+Pass column names as separate arguments when each column should have its own
+index:
+
 ```php
-User::table()->index('title')->update();
-User::table()->index(['title', 'author'])->update();
+Blog::table()->index('title', 'author')->update();
 ```
+
+This creates two indexes: `idx_title` and `idx_author`.
+
+#### One composite index
+
+Pass the columns in one array when they must be indexed together:
+
+```php
+Blog::table()->index(['title', 'author'])->update();
+```
+
+This creates one index containing `(title, author)`.
+
+#### Multiple composite indexes
+
+Pass multiple arrays to create multiple composite indexes:
+
+```php
+Blog::table()->index(
+    ['title', 'author'],
+    ['title', 'uri'],
+)->update();
+```
+
+This creates:
+
+```text
+idx_blog_title_author  (title, author)
+idx_blog_title_uri     (title, uri)
+```
+
+The following definitions have different meanings:
+
+```php
+// One composite index: (title, author, uri)
+Blog::table()->index(['title', 'author', 'uri'])->update();
+
+// Three separate indexes: (title), (author), and (uri)
+Blog::table()->index('title', 'author', 'uri')->update();
+```
+
+Calling `update()` applies the requested index definition and removes obsolete
+non-unique indexes from the table. A single-column index can also be declared
+with the `#[Index]` property attribute:
+
+```php
+use ORM\MySQL\Index;
+
+class Blog
+{
+    use MySQL;
+
+    #[Index]
+    public $title;
+}
+```
+
+On MySQL/MariaDB, indexes on `TEXT` or `BLOB` columns use a safe prefix length
+automatically. PostgreSQL creates the corresponding full-column indexes.
 
 ## 🔗 Foreign keys
 

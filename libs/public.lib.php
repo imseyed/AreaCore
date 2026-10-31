@@ -308,9 +308,9 @@ function upload_image($file_uploaded,$place,$replace_with=null,$name=null,$rand_
             return "c";$error=true;
         }
         if (empty($name)){
-            if (empty($rand_name)){//نام خود فایل
+            if (empty($rand_name)){ // The file name
                 $file_name=$image['name'];
-            }else{ // نام رندم
+            }else{ // Random name
                 $file_name="";
                 for ($a=1;$a<=$rand_name;$a++){
                     $file_name = $file_name.rand_string(5)."-";
@@ -377,9 +377,9 @@ function upload_file($file_uploaded, $place, $replace_with=null, $name=null, $ra
         }
         
         if (empty($name)){
-            if (empty($rand_name)){//نام خود فایل
+            if (empty($rand_name)){ // The file name
                 $file_name = basename($image['name']);
-            }else{ // نام رندم
+            }else{ // Random name
                 $file_name = "";
                 for ($a=1;$a<=$rand_name;$a++){
                     $file_name = $file_name.rand_string(5)."-";

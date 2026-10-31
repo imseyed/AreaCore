@@ -126,8 +126,9 @@ trait MySQL
     
     public function set(...$con): array|MySQL_Data
     {
-        if (count($con)==1 && is_numeric(@$con[0]))
-            $con = ["ID"=>$con[0]];
+        if (count($con) === 1 && array_key_exists(0, $con) && is_numeric($con[0])) {
+            $con = ["ID" => $con[0]];
+        }
         return self::get(...$con)->limit(1)->set_object($this);
     }
     

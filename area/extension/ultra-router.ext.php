@@ -146,12 +146,12 @@ class Router
             // $matches[0] = :foo
             // $matches[1] = foo
             $key = $matches[0];
-            // پیدا کردن مقدار در path (associative match)
+            // Find in path (associative match)
             if (isset(self::$path[$key])) {
                 return self::$path[$key];
             }
             
-            // اگر تعریف نشده بود همان را برگردان
+            // Return itself if not defined
             return $matches[0];
         }, $pattern);
     }
@@ -225,7 +225,7 @@ class Router
         // reference to root
         $current = &$this->tempVar;
         
-        // ساخت لایه‌های میانی
+        // Middle layers structure
         while (count($parts) > 1) {
             $part = array_shift($parts);
             
@@ -254,7 +254,7 @@ class Router
         $fileAddress = $this->resolve_paths($fileAddress);
         
         if (!str_starts_with('/', $fileAddress) && !str_starts_with($fileAddress, "./") && !str_starts_with($fileAddress, "../")) {
-            $fileAddress = "view/" . $fileAddress;
+            $fileAddress = __DIR__."/../../view/" . $fileAddress;
         }elseif (str_starts_with($fileAddress, "./") || str_starts_with($fileAddress, "../")){
             $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 1);
             $callerDir = dirname($trace[0]['file']);

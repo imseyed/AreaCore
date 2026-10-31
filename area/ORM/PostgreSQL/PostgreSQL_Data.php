@@ -160,13 +160,15 @@ class PostgreSQL_Data
             if ($this->notNULL) {
                 foreach ($this->notNULL as $item) {
                     $q = $this->quote((string)$item);
-                    $query .= "$q != '' AND ";
+                    $query .= $this->is_numeric_or_boolean_column((string)$item)
+                        ? "$q IS NOT NULL AND "
+                        : "$q != '' AND ";
                 }
             }
             if ($this->isNULL) {
                 foreach ($this->isNULL as $item) {
                     $q = $this->quote((string)$item);
-                    if (PostgreSQL_Table::is_boolean_property($this->calledClass, $item)) // اگر بولین هست به صورت رشته خالی چک نشه
+                    if ($this->is_numeric_or_boolean_column((string)$item))
                         $query .= "$q IS NULL AND ";
                     else
                         $query .= "($q = '' OR $q IS NULL) AND ";
@@ -272,7 +274,7 @@ class PostgreSQL_Data
                 $q = $this->condition_column_expression($item);
                 $valueExpression = $this->condition_value_expression($item);
                 if ($value === '') {
-                    if (PostgreSQL_Table::is_boolean_property($this->calledClass, $item)) // اگر بولین هست به صورت رشته خالی چک نشه
+                    if ($this->is_numeric_or_boolean_column($item))
                         $query .= "$q IS NULL AND ";
                     else
                         $query .= "($q = '' OR $q IS NULL) AND ";
@@ -517,6 +519,32 @@ class PostgreSQL_Data
         return $this->create_query();
     }
     
+    private function is_numeric_or_boolean_column(string $column): bool
+    {
+        if ($column === 'ID') {
+            return true;
+        }
+        if ($this->calledClass === '' || !class_exists($this->calledClass)) {
+            return false;
+        }
+        $reflection = new \ReflectionClass($this->calledClass);
+        if (!$reflection->hasProperty($column)) {
+            return false;
+        }
+        $property = $reflection->getProperty($column);
+        $attributes = $property->getAttributes(Length::class);
+        // Length overrides the PHP property type when creating the column.
+        if ($attributes) {
+            return in_array($attributes[0]->newInstance()->type, [
+                Type::BOOL, Type::SMALLINT, Type::INT, Type::BIGINT,
+                Type::REAL, Type::FLOAT, Type::DECIMAL,
+            ], true);
+        }
+        $type = $property->getType();
+        return $type instanceof \ReflectionNamedType
+            && in_array($type->getName(), ['int', 'float', 'bool'], true);
+    }
+
     private function quote(string $identifier): string
     {
         return PDO_SQL::quote($identifier);

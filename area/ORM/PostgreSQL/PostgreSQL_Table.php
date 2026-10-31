@@ -295,7 +295,7 @@ class PostgreSQL_Table
         $targetUpper = strtoupper($targetType);
         $existingLower = strtolower($existingType);
         
-        // حالت ۱: تبدیل از هر نوعی به BOOLEAN
+        // Condition 1: From anything's to BOOLEAN
         if ($targetUpper === 'BOOLEAN') {
             $nullFallback = $isNullable ? 'NULL' : 'false';
             
@@ -305,17 +305,17 @@ class PostgreSQL_Table
             if (preg_match('/^(text|citext|varchar|char)/', $existingLower)) {
                 return "CASE WHEN $quoted IS NULL THEN $nullFallback WHEN $quoted IN ('0','false','f','no','') THEN false ELSE true END";
             }
-            // fallback عمومی برای انواع دیگر
+            // fallback for another types
             return "CASE WHEN $quoted IS NULL THEN $nullFallback ELSE $quoted::boolean END";
         }
         
-        // حالت ۲: تبدیل از BOOLEAN به هر نوع دیگری -> باید 1/0 بشه
+        // Condition 2: From BOOLEAN to others, Conver from t&f to 1&0
         if (preg_match('/^bool/', $existingLower)) {
             $nullFallback = $isNullable ? 'NULL' : '0';
             return "CASE WHEN $quoted IS NULL THEN $nullFallback WHEN $quoted THEN 1 ELSE 0 END";
         }
         
-        // بقیه تبدیل‌ها cast معمولی
+        // Normal cast for another
         return "$quoted::" . $this->build_type_definition($targetType, null);
     }
     
