@@ -176,17 +176,13 @@ trait PostgreSQL
         if (!$reflection->hasProperty($attribute)) {
             return false;
         }
-        
         $table ??= self::this_class_table();
-        if (!$ID) {
-            $ID = $this->ID;
-        }
-        
+        if (!$ID) {$ID = $this->ID;}
+        $this->$attribute = $value;
         try {
             $this->normalize_booleans(get_class($this), $attribute, $value);
         } catch (\ReflectionException $e) {}
         
-        $this->$attribute = $value;
         return PDO_SQL::update_one_value($table, $ID, $attribute, $value);
     }
     

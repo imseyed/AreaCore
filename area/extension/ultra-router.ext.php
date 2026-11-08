@@ -111,7 +111,6 @@ class Router
             self::$requestMethod = $_SERVER['REQUEST_METHOD'];
             $uri = urldecode($uri);
             $uri = substr($uri, mb_strlen(base));
-            $uri = strtolower($uri);
             $uri = substr($uri, 0, strpos($uri, '?')?:strlen($uri));
             while (str_contains($uri, "//"))
                 $uri = str_replace("//","/",$uri);
