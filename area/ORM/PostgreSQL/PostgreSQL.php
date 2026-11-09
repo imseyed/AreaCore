@@ -47,6 +47,27 @@ trait PostgreSQL
         return array_diff($publicProperties, $staticProperties);
     }
     
+    /** Return the explicitly marked identifier, or the first matching conventional name. */
+    public static function identifier_column(): string
+    {
+        $reflection = new ReflectionClass(get_called_class());
+        $properties = self::properties();
+        $marked = [];
+        foreach ($properties as $name) {
+            if ($reflection->getProperty($name)->getAttributes(Identifier::class)) {
+                $marked[] = $name;
+            }
+        }
+        if (count($marked) > 1) {
+            throw new \LogicException('Only one property can be marked as Identifier.');
+        }
+        if ($marked) return $marked[0];
+        foreach (['ID', 'Id', 'id', 'Uuid', 'uuid', 'UUID'] as $name) {
+            if (in_array($name, $properties, true)) return $name;
+        }
+        return 'ID';
+    }
+
     static function table(?string $tableName = null): PostgreSQL_Table
     {
         if ($tableName)
@@ -107,10 +128,10 @@ trait PostgreSQL
         return $orm->set_condition($con, 'count');
     }
     
-    static function last_ID(?string $table = null): bool|int
+    static function last_ID(?string $table = null): bool|int|string
     {
         $table ??= self::this_class_table();
-        return PDO_SQL::last_id($table);
+        return PDO_SQL::last_id($table, self::identifier_column());
     }
     
     public function __construct(...$con)
@@ -122,70 +143,63 @@ trait PostgreSQL
     
     public function set(...$con): array|PostgreSQL_Data
     {
-        if (count($con) === 1 && array_key_exists(0, $con) && is_numeric($con[0])) {
-            $con = ["ID" => $con[0]];
+        if (count($con) === 1 && array_key_exists(0, $con) && (is_int($con[0]) || is_string($con[0]))) {
+            $con = [self::identifier_column() => $con[0]];
         }
         return self::get(...$con)->limit(1)->set_object($this);
     }
     
     public function set_byID($ID = 0): PostgreSQL_Data|bool|int
     {
+        $identifier = self::identifier_column();
         if (!$ID) {
-            if ($this->ID) {
-                $ID = $this->ID;
-            } else {
-                $this->clear();
-                return false;
-            }
+            $ID = $this->{$identifier} ?? null;
+            if (!$ID) { $this->clear(); return false; }
         }
-        return self::get(["ID" => $ID])->limit(1)->set_object($this);
+        return self::get([$identifier => $ID])->limit(1)->set_object($this);
     }
-    
+
     public function check(): bool
     {
-        return (bool)$this->ID;
+        $identifier = self::identifier_column();
+        return (bool)($this->{$identifier} ?? null);
     }
-    
-    public function save(?string $table = null, bool $newRow = false): bool|int
+
+    public function save(?string $table = null, bool $newRow = false): bool|int|string
     {
-        if ($table)
-            $table = PostgreSQL_Table::normalize_table_name($table);
+        if ($table) $table = PostgreSQL_Table::normalize_table_name($table);
         $table ??= self::this_class_table();
+        $identifier = self::identifier_column();
         $vars = $this->get_vars(false);
-        if (@$vars['ID'] && !$newRow) {
-            return $this->ID = PDO_SQL::update_row($table, $vars);
+        if (!empty($vars[$identifier]) && !$newRow) {
+            return PDO_SQL::update_row($table, $vars, $identifier) ?? false;
         }
-        return $this->ID = PDO_SQL::insert_row($table, $vars);
+        $result = PDO_SQL::insert_row($table, $vars, $identifier);
+        if ($result === false || $result === null) return false;
+        $this->{$identifier} = $result;
+        return $result;
     }
-    
+
     public function delete(string $table = ''): bool
     {
-        if (!$table) {
-            $table = self::this_class_table();
-        }
-        $vars = $this->get_vars(false);
-        if (@$vars['ID']) {
-            return PDO_SQL::delete_row($table, $vars['ID']);
-        }
-        return false;
+        if (!$table) $table = self::this_class_table();
+        $identifier = self::identifier_column();
+        $value = $this->{$identifier} ?? null;
+        return $value ? (PDO_SQL::delete_row($table, $value, $identifier) ?? false) : false;
     }
-    
+
     public function change($attribute, $value, $ID = null, $table = null): bool
     {
         $reflection = new ReflectionClass(get_class($this));
-        if (!$reflection->hasProperty($attribute)) {
-            return false;
-        }
+        if (!$reflection->hasProperty($attribute)) return false;
         $table ??= self::this_class_table();
-        if (!$ID) {$ID = $this->ID;}
+        $identifier = self::identifier_column();
+        $ID ??= $this->{$identifier} ?? null;
         $this->$attribute = $value;
-        try {
-            $this->normalize_booleans(get_class($this), $attribute, $value);
-        } catch (\ReflectionException $e) {}
-        
-        return PDO_SQL::update_one_value($table, $ID, $attribute, $value);
+        try { $this->normalize_booleans(get_class($this), $attribute, $value); } catch (\ReflectionException $e) {}
+        return PDO_SQL::update_one_value($table, $ID, $attribute, $value, $identifier) ?? false;
     }
-    
+
     public function __call(string $name, array $arguments): bool
     {
         $this->$name = $arguments[0];

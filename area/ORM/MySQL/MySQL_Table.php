@@ -14,7 +14,7 @@ class MySQL_Table
     private array $indexes = array();
     private array $options = [];
     private bool $changeStructure = false;
-    
+
     public function __construct(string $table, $properties, $calledClass = null)
     {
         $this->table = $table;
@@ -22,7 +22,7 @@ class MySQL_Table
         $this->calledClass = $calledClass;
         return $this;
     }
-    
+
     /**
      * Each string defines a separate index; each array defines a composite index.
      */
@@ -61,127 +61,159 @@ class MySQL_Table
         $this->options = array_replace($this->options, $options);
         return $this;
     }
-    
+
     public function create($replace=true): bool
     {
         $this->changeStructure = true;
         return PDO_SQL::run_exec($this->create_table_query($replace))!==false;
     }
-    
+
     public function delete(): bool
     {
         return PDO_SQL::table_delete($this->table);
     }
-    
+
     public function update(): bool
     {
-        $this->changeStructure = true;
-        if (!PDO_SQL::table_exist($this->table)){
-            return self::create();
+        if (!PDO_SQL::table_exist($this->table)) {
+            return $this->create();
         }
-        // echo $this->update_table_query();
-        if ($needChange = $this->update_table_query())
-            return PDO_SQL::run_exec($needChange)!==false;
-        return false;
+
+        $identifier = $this->calledClass::identifier_column();
+        $columns = PDO_SQL::table_columns($this->table);
+        $changedIdentifier = false;
+        if ($this->identifier_needs_update($columns, $identifier)) {
+            $changedIdentifier = PDO_SQL::change_empty_table($this->table, function () use ($identifier) {
+                $columns = PDO_SQL::table_columns($this->table);
+                return $this->identifier_needs_update($columns, $identifier)
+                    ? $this->identifier_update_query($columns, $identifier) : null;
+            });
+            if (!$changedIdentifier) return false;
+        }
+
+        $needChange = $this->update_table_query();
+        if ($needChange && PDO_SQL::run_exec($needChange) === false) return false;
+        $this->changeStructure = true;
+        return $changedIdentifier || (bool)$needChange;
     }
-    
+
     public function rename($oldName, $newName): bool
     {
         return PDO_SQL::table_rename($oldName, $newName);
     }
-    
+
     public function exist(): bool
     {
         return PDO_SQL::table_exist($this->table);
     }
-    
+
     private function create_table_query(bool $replace = true): string
     {
         $tableName = $this->table;
         $vars = $this->properties;
-        
+        $identifier = $this->calledClass::identifier_column();
+
         $query = '';
         if ($replace) {
             $query .= "DROP TABLE IF EXISTS `{$tableName}`; ";
         }
-        
-        $query .= "CREATE TABLE `{$tableName}` (
-        `ID` INT UNSIGNED NOT NULL AUTO_INCREMENT,";
-        
-        $reflection = new ReflectionClass($this->calledClass);
+
+        $query .= "CREATE TABLE `{$tableName}` (";
+        if (!in_array($identifier, $vars, true)) $query .= "`ID` INT UNSIGNED NOT NULL AUTO_INCREMENT,";
+
         foreach ($vars as $var) {
-            if ($var === "ID") {
-                continue;
-            }
-            
-            $columnType = 'TEXT';
-            $maxLength = null;
-            $isUnique = false;
-            
-            if ($reflection->hasProperty($var)) {
-                $prop = $reflection->getProperty($var);
-                
-                // Length attribute
-                $lengthAttributes = $prop->getAttributes(Length::class);
-                if (!empty($lengthAttributes)) {
-                    /** @var Length $length */
-                    $length = $lengthAttributes[0]->newInstance();
-                    $columnType = strtoupper($length->type->value);
-                    $maxLength = $length->maxLength;
-                } else {
-                    // Get type from declared property
-                    $type = $prop->getType();
-                    if ($type !== null) {
-                        $typeName = $type->getName();
-                        switch ($typeName) {
-                            case 'int':
-                                $columnType = 'BIGINT UNSIGNED';
-                                break;
-                            case 'float':
-                                $columnType = 'FLOAT';
-                                break;
-                            case 'bool':
-                                $columnType = 'TINYINT(1)';
-                                break;
-                            case 'string':
-                                $columnType = 'TEXT';
-                                break;
-                            default:
-                                $columnType = 'TEXT';
-                        }
+            $query .= $this->column_definition($var, $identifier) . ",";
+        }
+
+        $query .= "PRIMARY KEY (`{$identifier}`) USING BTREE )" . $this->table_options_sql() . ";";
+
+        return $query;
+    }
+
+    private function column_definition(string $var, string $identifier): string
+    {
+        if ($var === $identifier && strcasecmp($identifier, 'uuid') === 0) {
+            return $this->quote_identifier($var) . ' CHAR(36) NOT NULL DEFAULT (UUID())';
+        }
+        $reflection = new ReflectionClass($this->calledClass);
+        $columnType = 'TEXT';
+        $maxLength = null;
+        $isUnique = false;
+
+        if ($reflection->hasProperty($var)) {
+            $prop = $reflection->getProperty($var);
+
+            // Length attribute
+            $lengthAttributes = $prop->getAttributes(Length::class);
+            if (!empty($lengthAttributes)) {
+                /** @var Length $length */
+                $length = $lengthAttributes[0]->newInstance();
+                $columnType = strtoupper($length->type->value);
+                $maxLength = $length->maxLength;
+            } else {
+                // Get type from declared property
+                $type = $prop->getType();
+                if ($type !== null) {
+                    $typeName = $type->getName();
+                    switch ($typeName) {
+                        case 'int':
+                            $columnType = 'BIGINT UNSIGNED';
+                            break;
+                        case 'float':
+                            $columnType = 'FLOAT';
+                            break;
+                        case 'bool':
+                            $columnType = 'TINYINT(1)';
+                            break;
+                        case 'string':
+                            $columnType = 'TEXT';
+                            break;
+                        default:
+                            $columnType = 'TEXT';
                     }
                 }
-                
-                // Check for #[Unique]
-                $uniqueAttributes = $prop->getAttributes(Unique::class);
-                if (!empty($uniqueAttributes)) {
-                    $isUnique = true;
-                }
             }
-            
-            $columnDef = "`{$var}` ";
-            if ($columnType === 'VARCHAR' && $maxLength !== null) {
-                $columnDef .= "VARCHAR({$maxLength}) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
-            }elseif ($columnType === 'DECIMAL' && $maxLength !== null) {
-                $columnDef .= "DECIMAL({$maxLength})";
-            } elseif (in_array($columnType, ['TEXT', 'MEDIUMTEXT', 'LONGTEXT'])) {
-                $columnDef .= "{$columnType} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
-            } else {
-                $columnDef .= "{$columnType}";
+
+            if ($var === $identifier && !$prop->getType() && !$lengthAttributes && !in_array($var, ['Uuid', 'uuid', 'UUID'], true)) {
+                $columnType = 'INT UNSIGNED';
             }
-            
-            $columnDef .= " NULL";
-            
-            if ($isUnique) {
-                $columnDef .= " UNIQUE";
+
+            // Check for #[Unique]
+            $uniqueAttributes = $prop->getAttributes(Unique::class);
+            if (!empty($uniqueAttributes)) {
+                $isUnique = true;
             }
-            
-            $query .= $columnDef . ",";
         }
-        
-        $query .= "PRIMARY KEY (`ID`) USING BTREE )" . $this->table_options_sql() . ";";
-        
-        return $query;
+
+        $columnDef = "`{$var}` ";
+        if ($columnType === 'VARCHAR' && $maxLength !== null) {
+            $columnDef .= "VARCHAR({$maxLength}) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
+        }elseif ($columnType === 'DECIMAL' && $maxLength !== null) {
+            $columnDef .= "DECIMAL({$maxLength})";
+        } elseif (in_array($columnType, ['TEXT', 'MEDIUMTEXT', 'LONGTEXT'])) {
+            $columnDef .= "{$columnType} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
+        } else {
+            $columnDef .= "{$columnType}";
+        }
+
+        if ($var === $identifier) {
+            if (preg_match('/^(SMALLINT|MEDIUMINT|INT|BIGINT)/', $columnType)) {
+                $columnDef .= " NOT NULL AUTO_INCREMENT";
+            } else {
+                if (in_array($columnType, ['TEXT', 'MEDIUMTEXT', 'LONGTEXT'], true)) {
+                    $columnDef = "`{$var}` VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
+                }
+                $columnDef .= " NOT NULL";
+            }
+        } else {
+            $columnDef .= " NULL";
+        }
+
+        if ($isUnique && $var !== $identifier) {
+            $columnDef .= " UNIQUE";
+        }
+
+        return $columnDef;
     }
 
     private function table_options_sql(): string
@@ -235,35 +267,86 @@ class MySQL_Table
         }
         return $value === true || $value === 1 || $value === '1';
     }
-    
+
+    private function quote_identifier(string $identifier): string
+    {
+        return '`' . str_replace('`', '``', $identifier) . '`';
+    }
+
+    private function identifier_needs_update(array $columns, string $identifier): bool
+    {
+        $primary = array_values(array_map(
+            fn($column) => $column['Field'],
+            array_filter($columns, fn($column) => ($column['Key'] ?? '') === 'PRI')
+        ));
+        if ($primary !== [$identifier]) return true;
+        if (strcasecmp($identifier, 'uuid') !== 0) return false;
+        foreach ($columns as $column) {
+            if ($column['Field'] === $identifier) return strtolower($column['Type']) !== 'char(36)';
+        }
+        return true;
+    }
+
+    private function identifier_update_query(array $columns, string $identifier): string
+    {
+        $primary = array_values(array_filter($columns, fn($column) => ($column['Key'] ?? '') === 'PRI'));
+        $existing = [];
+        foreach ($columns as $column) $existing[strtolower($column['Field'])] = $column;
+        $actions = [];
+        if (count($primary) === 1 && $primary[0]['Field'] === $identifier
+            && strcasecmp($identifier, 'uuid') === 0) {
+            return 'ALTER TABLE ' . $this->quote_identifier($this->table) . ' MODIFY COLUMN '
+                . $this->column_definition($identifier, $identifier);
+        }
+        if ($primary) $actions[] = 'DROP PRIMARY KEY';
+        foreach ($primary as $column) {
+            if (stripos($column['Extra'] ?? '', 'auto_increment') !== false && strcasecmp($column['Field'], $identifier) !== 0) {
+                $nullable = in_array($column['Field'], $this->properties, true) ? ' NULL' : ' NOT NULL';
+                $actions[] = 'MODIFY COLUMN ' . $this->quote_identifier($column['Field']) . ' ' . $column['Type'] . $nullable;
+            }
+        }
+        $definition = in_array($identifier, $this->properties, true)
+            ? $this->column_definition($identifier, $identifier)
+            : $this->quote_identifier($identifier) . ' INT UNSIGNED NOT NULL AUTO_INCREMENT';
+        $actions[] = (isset($existing[strtolower($identifier)]) ? 'MODIFY COLUMN ' : 'ADD COLUMN ') . $definition;
+        $actions[] = 'ADD PRIMARY KEY (' . $this->quote_identifier($identifier) . ')';
+        return 'ALTER TABLE ' . $this->quote_identifier($this->table) . ' ' . implode(', ', $actions);
+    }
+
     private function update_table_query(): ?string
     {
+        $identifier = $this->calledClass::identifier_column();
         $tableName = $this->table;
         $vars = $this->properties;
         $reflection = new ReflectionClass($this->calledClass);
-        
+
         // Collect existing columns
         $existingColumns = PDO_SQL::table_columns($tableName);
-        
-        
+
+
         $existingColumnMap = [];
         foreach ($existingColumns as $col) {
             $existingColumnMap[$col['Field']] = $col;
         }
-        
+
         $alterStatements = [];
-        
+        if (strcasecmp($identifier, 'uuid') === 0 && isset($existingColumnMap[$identifier])
+            && strtolower($existingColumnMap[$identifier]['Type']) === 'char(36)'
+            && !preg_match('/^\\(*\\s*uuid\\(\\)\\s*\\)*$/i', trim($existingColumnMap[$identifier]['Default'] ?? ''))) {
+            $alterStatements[] = 'ALTER COLUMN ' . $this->quote_identifier($identifier) . ' SET DEFAULT (UUID())';
+        }
+
         foreach ($vars as $index=>$var) {
-            if ($var === "ID") continue;
-            
+            if ($var === $identifier) continue;
+
             $columnType = 'TEXT';
             $maxLength = null;
             $isUnique = false;
-            
+
             if ($reflection->hasProperty($var)) {
                 $prop = $reflection->getProperty($var);
-                
-                
+
+
                 // Attribute: #[Length]
                 $lengthAttrs = $prop->getAttributes(Length::class);
                 if ($lengthAttrs) {
@@ -292,14 +375,14 @@ class MySQL_Table
                         }
                     }
                 }
-                
+
                 // Attribute: #[Unique]
                 $uniqueAttrs = $prop->getAttributes(Unique::class);
                 if ($uniqueAttrs) {
                     $isUnique = true;
                 }
             }
-            
+
             // Create define columns
             if ($columnType === 'VARCHAR' && $maxLength) {
                 $definition = "VARCHAR({$maxLength}) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL";
@@ -310,12 +393,12 @@ class MySQL_Table
             } else {
                 $definition = "{$columnType} NULL";
             }
-            
+
             // Add UNIQUE
             if ($isUnique) {
                 $definition .= " UNIQUE";
             }
-            
+
             if (!isset($existingColumnMap[$var])) {
                 // If column not exist → ADD
                 $alterStatements[] = "ADD COLUMN `{$var}` {$definition}";
@@ -323,68 +406,69 @@ class MySQL_Table
                 // If column exist → MODIFY
                 $existingType = strtolower($existingColumnMap[$var]['Type']);
                 $expectedType = strtolower(preg_replace('/ character set.*$/i', '', $definition));
-                
+
                 $isUniqueInDb = ($existingColumnMap[$var]['Key'] ?? '') === 'UNI';
-                
+
                 // Need any change?
                 $shouldModify =
                     $this->should_modify_column($existingType, $expectedType) ||
+                    (($existingColumnMap[$var]['Null'] ?? 'YES') === 'NO') ||
                     ($isUnique !== $isUniqueInDb);
-                
+
                 if ($shouldModify) {
                     // If change TYPE or MODIFY
                     $alterStatements[] = "MODIFY COLUMN `{$var}` {$definition}";
-                    
+
                     // If was unique but now not → DROP INDEX
                     if (!$isUnique && $isUniqueInDb) {
                         $alterStatements[] = "DROP INDEX `{$var}`";
                     }
-                    
+
                     // if was not unique but now is → Don't need change because in MODIFY
                 }
             }
-            
+
             // Remove extra columns not in class
             foreach ($existingColumnMap as $existingCol => $colData) {
-                if ($existingCol === "ID") continue; // Don't drop primary key
+                if ($existingCol === $identifier) continue; // Don't drop primary key
                 if (!in_array($existingCol, $vars)) {
                     $alterStatements[] = "DROP COLUMN  IF EXISTS `$existingCol`";
                 }
             }
-            
+
         }
-        
+
         if (empty($alterStatements)) return null;
-        
+
         return "ALTER TABLE `{$tableName}` " . implode(", ", $alterStatements) . ";";
     }
-    
+
     private function index_definition_query(): string
     {
         $tableName = $this->table;
-        
+
         // Get existing indexes
         $rows = PDO_SQL::table_indexes($tableName);
         $columnTypes = [];
         foreach (PDO_SQL::table_columns($tableName) as $column) {
             $columnTypes[strtolower($column['Field'])] = strtolower($column['Type']);
         }
-        
+
         $existingIndexes = [];
         foreach ($rows as $row) {
             if ((int)$row['Non_unique'] === 0) continue; // Don't consider unique indexes
-            
+
             $key = $row['Key_name'];
             $seq = (int)$row['Seq_in_index'] - 1;
             $existingIndexes[$key][$seq] = $row['Column_name'];
         }
-        
+
         foreach ($existingIndexes as &$cols) {
             ksort($cols);
             $cols = array_values($cols);
         }
         unset($cols);
-        
+
         // Defined indexes in Class
         $normalizedIndexes = [];
         foreach ($this->indexes as $key => $val) {
@@ -392,13 +476,13 @@ class MySQL_Table
             $indexName = is_int($key) ? 'idx_' . implode('_', $cols) : $key;
             $normalizedIndexes[$indexName] = array_values($cols);
         }
-        
+
         $query = '';
-        
+
         // Remove extra indexes not in class yet
         foreach ($existingIndexes as $existingName => $existingCols) {
             $existingColsLower = array_map('strtolower', $existingCols);
-            
+
             $found = false;
             foreach ($normalizedIndexes as $normCols) {
                 if ($existingColsLower === array_map('strtolower', $normCols)) {
@@ -406,16 +490,16 @@ class MySQL_Table
                     break;
                 }
             }
-            
+
             if (!$found) {
                 $query .= "ALTER TABLE `{$tableName}` DROP INDEX `{$existingName}`;\n";
             }
         }
-        
+
         // Add new indexes
         foreach ($normalizedIndexes as $indexName => $columns) {
             $columnsNormalized = array_map('strtolower', $columns);
-            
+
             $found = false;
             foreach ($existingIndexes as $existingCols) {
                 $existingColsNormalized = array_map('strtolower', $existingCols);
@@ -424,7 +508,7 @@ class MySQL_Table
                     break;
                 }
             }
-            
+
             if (!$found) {
                 // TEXT/BLOB indexes need a prefix. Budget for utf8mb4's four
                 // bytes per character within InnoDB's 3072-byte key limit.
@@ -442,15 +526,15 @@ class MySQL_Table
                 $query .= "ALTER TABLE `{$tableName}` ADD INDEX `$indexName` ($cols);\n";
             }
         }
-        
+
         return $query;
     }
-    
+
     private function should_modify_column(string $existingType, string $expectedType): bool {
         // normalize
         $existingType = strtolower($existingType);
         $expectedType = strtolower($expectedType);
-        
+
         // parse base type, length (supports "10" and "10,2") and unsigned
         $parse_type = function ($type) {
             $unsigned = str_contains($type, 'unsigned');
@@ -471,10 +555,10 @@ class MySQL_Table
                 'unsigned' => $unsigned
             ];
         };
-        
+
         $ex = $parse_type($existingType);
         $exp = $parse_type($expectedType);
-        
+
         // base type changed
         if ($ex['base'] !== $exp['base']) {
             return true;
@@ -503,6 +587,6 @@ class MySQL_Table
                 PDO_SQL::run_exec($indexesQuery);
         }
     }
-    
-    
+
+
 }

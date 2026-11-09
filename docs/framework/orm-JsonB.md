@@ -1,14 +1,14 @@
 # PostgreSQL JSONB ORM
 
-این مستند نحوه استفاده از قابلیت JSONB در ORM PostgreSQL فریم‌ورک AreaCore را توضیح می‌دهد.
+This document explains how to use JSONB in AreaCore's PostgreSQL ORM.
 
-قابلیت JSONB از طریق کلاس `PostgreSQL_DataJson` به query builder اصلی وصل می‌شود و مثل بقیه ORM به صورت chainable کار می‌کند.
+JSONB support is connected to the main query builder through the `PostgreSQL_DataJson` class and works as a chainable part of the ORM.
 
 ---
 
-## تعریف ستون JSONB
+## Define a JSONB column
 
-برای ساخت ستون JSONB از attribute نوع ستون استفاده کنید:
+Use the column type attribute to create a JSONB column:
 
 ```php
 use ORM\PostgreSQL\Length;
@@ -26,7 +26,7 @@ class Product
 }
 ```
 
-سپس در حالت توسعه می‌توانید schema را مثل بقیه مدل‌ها sync کنید:
+During development, you can then synchronize the schema as you would for other models:
 
 ```php
 Product::table()->update();
@@ -34,9 +34,9 @@ Product::table()->update();
 
 ---
 
-## درج داده JSONB
+## Insert JSONB data
 
-مقدار JSONB می‌تواند به شکل JSON string ذخیره شود:
+A JSONB value can be stored as a JSON string:
 
 ```php
 $product = new Product();
@@ -49,7 +49,7 @@ $product->meta = json_encode([
 $product->save();
 ```
 
-در insert مستقیم هم مقدار JSON را به صورت string ارسال کنید:
+For a direct insert, also pass the JSON value as a string:
 
 ```php
 Product::insert([
@@ -62,9 +62,9 @@ Product::insert([
 
 ---
 
-## شروع Query روی JSONB
+## Start a JSONB query
 
-برای فیلتر کردن یک ستون JSONB از متد `jsonb()` بعد از `get()` استفاده کنید:
+To filter a JSONB column, call `jsonb()` after `get()`:
 
 ```php
 Product::get()
@@ -72,7 +72,7 @@ Product::get()
     ->do;
 ```
 
-هر متد JSONB در پایان، query builder اصلی را برمی‌گرداند؛ بنابراین می‌توانید بقیه متدهای ORM را ادامه دهید:
+Each JSONB method returns the main query builder, so you can continue chaining other ORM methods:
 
 ```php
 Product::get()
@@ -84,11 +84,11 @@ Product::get()
 
 ---
 
-## عملیات پشتیبانی‌شده
+## Supported operations
 
 ### contains
 
-معادل عملگر `@>` در PostgreSQL است.
+Equivalent to PostgreSQL's `@>` operator:
 
 ```php
 Product::get()
@@ -96,7 +96,7 @@ Product::get()
     ->do;
 ```
 
-روی مسیر داخلی:
+At a nested path:
 
 ```php
 Product::get()
@@ -104,7 +104,7 @@ Product::get()
     ->do;
 ```
 
-مسیر چندسطحی:
+At a multi-level path:
 
 ```php
 Product::get()
@@ -114,7 +114,7 @@ Product::get()
 
 ### contained_by
 
-معادل عملگر `<@` است.
+Equivalent to the `<@` operator:
 
 ```php
 Product::get()
@@ -124,7 +124,7 @@ Product::get()
 
 ### has_key
 
-بررسی وجود یک key در object JSONB:
+Check whether a key exists in a JSONB object:
 
 ```php
 Product::get()
@@ -132,7 +132,7 @@ Product::get()
     ->do;
 ```
 
-روی مسیر داخلی:
+At a nested path:
 
 ```php
 Product::get()
@@ -142,7 +142,7 @@ Product::get()
 
 ### has_any_key
 
-بررسی وجود حداقل یکی از کلیدها:
+Check whether at least one of the keys exists:
 
 ```php
 Product::get()
@@ -152,7 +152,7 @@ Product::get()
 
 ### has_all_keys
 
-بررسی وجود همه کلیدها:
+Check whether all of the keys exist:
 
 ```php
 Product::get()
@@ -162,9 +162,9 @@ Product::get()
 
 ---
 
-## Query روی Path
+## Query a path
 
-برای خواندن و مقایسه مقدار داخل JSONB از متدهای path استفاده کنید.
+Use the path methods to read and compare values inside JSONB.
 
 ### path_equals
 
@@ -174,7 +174,7 @@ Product::get()
     ->do;
 ```
 
-مسیر چندسطحی:
+At a multi-level path:
 
 ```php
 Product::get()
@@ -190,9 +190,9 @@ Product::get()
     ->do;
 ```
 
-### مقایسه عددی
+### Numeric comparisons
 
-متدهای زیر مقدار path را به `numeric` تبدیل می‌کنند:
+The following methods cast the path value to `numeric`:
 
 ```php
 Product::get()
@@ -214,7 +214,7 @@ Product::get()
 
 ### where_path
 
-برای operator دلخواه:
+Use a custom operator:
 
 ```php
 Product::get()
@@ -222,13 +222,13 @@ Product::get()
     ->do;
 ```
 
-operatorهای مجاز:
+Allowed operators:
 
 ```text
 =, <>, !=, >, >=, <, <=, LIKE, ILIKE
 ```
 
-### path_is_null و path_is_not_null
+### path_is_null and path_is_not_null
 
 ```php
 Product::get()
@@ -244,11 +244,11 @@ Product::get()
 
 ## JSONPath
 
-PostgreSQL از `jsonpath` هم پشتیبانی می‌کند.
+PostgreSQL also supports `jsonpath`.
 
 ### path_exists
 
-معادل `@?`:
+Equivalent to `@?`:
 
 ```php
 Product::get()
@@ -258,7 +258,7 @@ Product::get()
 
 ### path_match
 
-معادل `@@`:
+Equivalent to `@@`:
 
 ```php
 Product::get()
@@ -268,9 +268,9 @@ Product::get()
 
 ---
 
-## OR در شرط JSONB
+## OR in JSONB conditions
 
-برای شرط JSONB بعدی می‌توانید از `or()` استفاده کنید:
+Use `or()` for the next JSONB condition:
 
 ```php
 Product::get(["title*" => "Laptop"])
@@ -280,7 +280,7 @@ Product::get(["title*" => "Laptop"])
 
 ---
 
-## ترکیب با بقیه ORM
+## Combine with other ORM methods
 
 ```php
 Product::get(["title*" => "Laptop"])
@@ -294,9 +294,9 @@ Product::get(["title*" => "Laptop"])
 
 ---
 
-## شرط روی دو ستون JSONB
+## Conditions on two JSONB columns
 
-بعد از هر شرط JSONB، query builder اصلی برمی‌گردد؛ بنابراین می‌توانید روی ستون JSONB دیگری هم شرط جدا بگذارید:
+After each JSONB condition, the main query builder is returned, so you can add a separate condition on another JSONB column:
 
 ```php
 Product::get()
@@ -305,7 +305,7 @@ Product::get()
     ->do;
 ```
 
-مثال با path:
+Example using paths:
 
 ```php
 Product::get()
@@ -316,12 +316,11 @@ Product::get()
 
 ---
 
-## نکات مهم
+## Important notes
 
-* ستون باید با `#[Length(type: Type::JSONB)]` ساخته شود.
-* مقدارهای object و array در متدهای JSONB به صورت خودکار به JSON تبدیل می‌شوند.
-* اگر مقدار را به شکل string بدهید و string معتبر JSON باشد، همان مقدار استفاده می‌شود.
-* مقدارهای مقایسه path به صورت bind parameter ارسال می‌شوند.
-* نام ستون quote می‌شود و مقدارها مستقیم داخل SQL قرار نمی‌گیرند.
-* برای index بهتر روی JSONB می‌توانید در سطح دیتابیس از GIN index استفاده کنید.
-
+* The column must be created with `#[Length(type: Type::JSONB)]`.
+* Objects and arrays passed to JSONB methods are automatically converted to JSON.
+* If you pass a string containing valid JSON, that string is used as-is.
+* Path comparison values are sent as bound parameters.
+* Column names are quoted and values are not placed directly into SQL.
+* For better JSONB indexing, you can use a GIN index at the database level.

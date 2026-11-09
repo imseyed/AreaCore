@@ -272,13 +272,55 @@ class PDO_SQL
         return self::table_columns($tableName);
     }
     
+    /** Change a table only while it is empty and locked against writes. */
+    public static function change_empty_table(string $table, callable $buildQuery): bool
+    {
+        new self;
+        if (!self::$connection) return false;
+        $ownsTransaction = !self::$connection->inTransaction();
+        try {
+            if ($ownsTransaction) self::$connection->beginTransaction();
+            else self::$connection->exec('SAVEPOINT orm_identifier_change');
+            $quoted = self::quote($table);
+            if (self::$connection->exec('LOCK TABLE ' . $quoted . ' IN ACCESS EXCLUSIVE MODE') === false) {
+                throw new \RuntimeException('Could not lock table for primary key update.');
+            }
+            $statement = self::$connection->query('SELECT 1 FROM ' . $quoted . ' LIMIT 1');
+            if ($statement === false) throw new \RuntimeException('Could not check table for data.');
+            $hasRows = $statement->fetchColumn() !== false;
+            $statement->closeCursor();
+            if ($hasRows) throw new \LogicException('Cannot change the primary key or its type because the table contains data.');
+            $query = $buildQuery();
+            if ($query !== null && self::$connection->exec($query) === false) {
+                throw new \RuntimeException('Could not change the primary key.');
+            }
+            if ($ownsTransaction) self::$connection->commit();
+            else self::$connection->exec('RELEASE SAVEPOINT orm_identifier_change');
+            return true;
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && self::$connection->inTransaction()) self::$connection->rollBack();
+            elseif (!$ownsTransaction) self::$connection->exec('ROLLBACK TO SAVEPOINT orm_identifier_change');
+            if ($e instanceof \LogicException) throw $e;
+            self::$error .= $e->getMessage() . EOL;
+            return false;
+        }
+    }
+
     public static function table_columns($tableName): array
     {
         $query = "
             SELECT
                 a.attname AS \"Field\",
+                a.attidentity AS \"Identity\",
+                CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS \"Null\",
+                (SELECT pk.conname FROM pg_constraint pk WHERE pk.contype = 'p' AND pk.conrelid = cls.oid AND a.attnum = ANY(pk.conkey) LIMIT 1) AS \"PrimaryConstraint\",
                 pg_catalog.format_type(a.atttypid, a.atttypmod) AS \"Type\",
+                (SELECT pg_get_expr(d.adbin, d.adrelid) FROM pg_attrdef d WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum) AS \"Default\",
                 CASE WHEN EXISTS (
+                    SELECT 1 FROM pg_constraint pk
+                    WHERE pk.contype = 'p' AND pk.conrelid = cls.oid
+                      AND a.attnum = ANY(pk.conkey)
+                ) THEN 'PRI' WHEN EXISTS (
                     SELECT 1
                     FROM pg_constraint con
                     JOIN pg_attribute ua ON ua.attrelid = con.conrelid
@@ -350,7 +392,7 @@ class PDO_SQL
         return self::search_where("SELECT * FROM $qTable WHERE $qID = ?", [$ID]);
     }
     
-    public static function last_ID(string $table)
+    public static function last_ID(string $table, string $identifier = 'ID')
     {
         new self;
         if (!self::$connection) {
@@ -359,9 +401,10 @@ class PDO_SQL
         try {
             $alias = self::count_alias();
             $qTable = self::quote($table);
-            $qID = self::quote("ID");
-            $statement = self::run_query("SELECT MAX($qID) AS \"$alias\" FROM $qTable");
-            return (int)($statement?->data_to_array_num()[0][$alias] ?? 0);
+            $qID = self::quote($identifier);
+            $statement = self::run_query("SELECT $qID AS \"$alias\" FROM $qTable ORDER BY $qID DESC LIMIT 1");
+            $value = $statement?->data_to_array_num()[0][$alias] ?? null;
+            return is_numeric($value) ? (int)$value : ($value ?? false);
         } catch (PDOException $e) {
             self::$error .= 'We have ERROR in count MAX data!' . EOL;
             self::$error .= $e->getMessage() . EOL;
@@ -451,16 +494,17 @@ class PDO_SQL
         }
     }
     
-    public static function insert_row($table, $vars): false|int|null
+    public static function insert_row($table, $vars, string $identifier = 'ID'): false|int|string|null
     {
         new self;
         if (!self::$connection) {
             return null;
         }
         
-        if (array_key_exists('ID', $vars)) {
-            if ($vars['ID'] === null || $vars['ID'] === '' || (is_numeric($vars['ID']) && (int)$vars['ID'] === 0)) {
-                unset($vars['ID']);
+        $suppliedID = $vars[$identifier] ?? null;
+        if (array_key_exists($identifier, $vars)) {
+            if ($vars[$identifier] === null || $vars[$identifier] === '' || ($vars[$identifier] === 0 || $vars[$identifier] === '0')) {
+                unset($vars[$identifier]);
             }
         }
         
@@ -477,7 +521,7 @@ class PDO_SQL
         try {
             self::$connection->beginTransaction();
             $qTable = self::quote($table);
-            $qID = self::quote("ID");
+            $qID = self::quote($identifier);
             if ($columns === "" || $values === "") {
                 $statement = self::$connection->prepare("INSERT INTO $qTable DEFAULT VALUES RETURNING $qID;");
                 $statement->execute();
@@ -486,8 +530,11 @@ class PDO_SQL
                 $statement->execute($valuesArray);
             }
             $insertedID = $statement->fetchColumn();
+            $statement->closeCursor();
             self::$connection->commit();
-            return (int)$insertedID;
+            return ($suppliedID !== null && $suppliedID !== '' && $suppliedID !== 0 && $suppliedID !== '0')
+                ? $suppliedID
+                : (is_numeric($insertedID) ? (int)$insertedID : (string)$insertedID);
         } catch (PDOException $e) {
             if (self::$connection->inTransaction()) {
                 self::$connection->rollback();
@@ -498,7 +545,7 @@ class PDO_SQL
         }
     }
     
-    public static function update_row($table, $vars): bool|int|null
+    public static function update_row($table, $vars, string $identifier = 'ID'): bool|int|string|null
     {
         new self;
         if (!self::$connection) {
@@ -506,21 +553,22 @@ class PDO_SQL
         }
         
         $string = "";
-        $ID = $vars['ID'];
-        unset($vars['ID']);
+        $ID = $vars[$identifier];
+        unset($vars[$identifier]);
         $valuesArray = [];
         foreach ($vars as $item => $value) {
             $string .= self::quote((string)$item) . " = ?,";
             $valuesArray[] = $value;
         }
         $string = rtrim($string, ",");
+        if ($string === "") return $ID;
         $valuesArray[] = $ID;
         try {
             $qTable = self::quote($table);
-            $qID = self::quote("ID");
+            $qID = self::quote($identifier);
             $statement = self::$connection->prepare("UPDATE $qTable SET $string WHERE $qID = ?");
             $statement->execute($valuesArray);
-            return (int)$ID;
+            return $ID;
         } catch (PDOException $e) {
             echo 'We have ERROR in set data!' . EOL;
             self::$error .= $e->getMessage() . EOL;
@@ -528,7 +576,7 @@ class PDO_SQL
         }
     }
     
-    public static function delete_row($table, $ID): ?bool
+    public static function delete_row($table, $ID, string $identifier = 'ID'): ?bool
     {
         new self;
         if (!self::$connection) {
@@ -537,7 +585,7 @@ class PDO_SQL
         
         try {
             $qTable = self::quote($table);
-            $qID = self::quote("ID");
+            $qID = self::quote($identifier);
             $statement = self::$connection->prepare("DELETE FROM $qTable WHERE $qID = ?");
             $statement->execute([$ID]);
             return true;
@@ -548,7 +596,7 @@ class PDO_SQL
         }
     }
     
-    public static function update_one_value($table, $ID, $attribute, $value): ?bool
+    public static function update_one_value($table, $ID, $attribute, $value, string $identifier = 'ID'): ?bool
     {
         new self;
         if (!self::$connection) {
@@ -557,7 +605,7 @@ class PDO_SQL
         try {
             $qTable = self::quote($table);
             $qAttr = self::quote($attribute);
-            $qID = self::quote("ID");
+            $qID = self::quote($identifier);
             $statement = self::$connection->prepare("UPDATE $qTable SET $qAttr = :value WHERE $qID = :id");
             $statement->bindValue(':value', $value);
             $statement->bindValue(':id', $ID);

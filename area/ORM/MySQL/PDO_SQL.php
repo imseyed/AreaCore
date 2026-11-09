@@ -213,6 +213,34 @@ class PDO_SQL
         return self::run_query("DESCRIBE `$tableName`;")->data_to_array();
     }
     
+    /** Change a table only while it is empty and locked against writes. */
+    public static function change_empty_table(string $table, callable $buildQuery): bool
+    {
+        new self;
+        if (!self::$connection) return false;
+        if (self::$connection->inTransaction()) {
+            throw new \LogicException('Cannot change a primary key inside an active MySQL transaction.');
+        }
+        $quoted = self::quote_identifier($table);
+        $locked = false;
+        try {
+            if (self::$connection->exec('LOCK TABLES ' . $quoted . ' WRITE') === false) return false;
+            $locked = true;
+            $statement = self::$connection->query('SELECT 1 FROM ' . $quoted . ' LIMIT 1');
+            if ($statement === false) return false;
+            $hasRows = $statement->fetchColumn() !== false;
+            $statement->closeCursor();
+            if ($hasRows) throw new \LogicException('Cannot change the primary key because the table contains data.');
+            $query = $buildQuery();
+            return $query === null || self::$connection->exec($query) !== false;
+        } catch (PDOException $e) {
+            self::$error .= $e->getMessage() . EOL;
+            return false;
+        } finally {
+            if ($locked) self::$connection->exec('UNLOCK TABLES');
+        }
+    }
+
     public static function table_columns($tableName): array
     {
         $stms = self::run_query("SHOW COLUMNS FROM `$tableName`;");
@@ -247,12 +275,14 @@ class PDO_SQL
         return self::run_query("SELECT * FROM `$table` WHERE ID=`$ID`");
     }
     
-    public static function last_ID(string $table)
+    public static function last_ID(string $table, string $identifier = 'ID')
     {
         new self; if (!self::$connection) return null;
         try {
-            $statement = self::run_query("SELECT MAX(ID) FROM `$table` ");
-            return (int) $statement->data_to_array_num()[0]['MAX(ID)'];
+            $column = str_replace('`', '``', $identifier);
+            $statement = self::run_query("SELECT MAX(`$column`) AS max_id FROM `$table`");
+            $value = $statement->data_to_array_num()[0]['max_id'] ?? null;
+            return is_numeric($value) ? (int)$value : ($value ?? false);
         } catch(PDOException $e) {
             self::$error .= 'We have ERROR in count MAX data!' .EOL;
             self::$error .= $e->getMessage() .EOL;
@@ -335,52 +365,70 @@ class PDO_SQL
     }
     
     
-    public static function insert_row($table,$vars): false|int|null
+    public static function insert_row($table,$vars, string $identifier = 'ID'): false|int|string|null
     {
         new self; if (!self::$connection) return null;
-        
-        $columns=""; $values=""; $valuesArray=[];
-        foreach ($vars as $item=>$value){
-            $columns .= "`".$item."`,";
-            $values .= "?,";
-            $valuesArray[] = $value;
-        }
-        $columns = rtrim($columns,",");
-        $values = rtrim($values,",");
+
+        $suppliedID = $vars[$identifier] ?? null;
         try {
             self::$connection->beginTransaction();
-            $statement = self::$connection->prepare("INSERT INTO `$table`(".$columns.") VALUES (".$values.");");
-            $statement->execute($valuesArray);
-            $insertedID = self::$connection->lastInsertId();
-            self::$connection->commit();
-            return (int)$insertedID;
-        } catch(PDOException $e) {
-            if (self::$connection->inTransaction()) {
-                self::$connection->rollback();
+            if (($suppliedID === null || $suppliedID === '') && strcasecmp($identifier, 'uuid') === 0) {
+                $uuidStatement = self::$connection->query('SELECT UUID()');
+                if ($uuidStatement === false) throw new \RuntimeException('Could not generate UUID.');
+                $suppliedID = $uuidStatement->fetchColumn();
+                $uuidStatement->closeCursor();
+                if (!is_string($suppliedID) || !preg_match('/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i', $suppliedID)) {
+                    throw new \RuntimeException('Database returned an invalid UUID.');
+                }
+                $vars[$identifier] = $suppliedID;
+            } elseif ($suppliedID === null || $suppliedID === '' || $suppliedID === 0) {
+                unset($vars[$identifier]);
             }
+
+            $columns = [];
+            $valuesArray = [];
+            foreach ($vars as $item => $value) {
+                $columns[] = self::quote_identifier((string)$item);
+                $valuesArray[] = $value;
+            }
+            $sql = 'INSERT INTO ' . self::quote_identifier($table) . ' (' . implode(',', $columns) . ') VALUES ('
+                . implode(',', array_fill(0, count($columns), '?')) . ')';
+            $statement = self::$connection->prepare($sql);
+            if ($statement === false || !$statement->execute($valuesArray)) {
+                throw new \RuntimeException('Could not insert row.');
+            }
+            $insertedID = ($suppliedID !== null && $suppliedID !== '' && $suppliedID !== 0)
+                ? $suppliedID : (int)self::$connection->lastInsertId();
+            self::$connection->commit();
+            return $insertedID;
+        } catch (PDOException|\RuntimeException $e) {
+            if (self::$connection->inTransaction()) self::$connection->rollback();
             echo 'We have ERROR in set data!'.EOL;
             self::$error .= $e->getMessage().EOL;
             return false;
         }
     }
-    
-    public static function update_row($table,$vars): bool|int|null
+
+    public static function update_row($table,$vars, string $identifier = 'ID'): bool|int|string|null
     {
         new self; if (!self::$connection) return null;
         
         $string="";
-        $ID = $vars['ID'];
-        unset($vars['ID']);
+        $ID = $vars[$identifier];
+        unset($vars[$identifier]);
         $valuesArray = [];
         foreach ($vars as $item=>$value){
             $string .= "`".$item."` = ?,";
             $valuesArray[] = $value;
         }
         $string = rtrim($string,",");
+        if ($string === "") return $ID;
+        $valuesArray[] = $ID;
+        $key = str_replace('`', '``', $identifier);
         try {
-            $statement = self::$connection->prepare("UPDATE `$table` SET $string WHERE `ID` = $ID");
+            $statement = self::$connection->prepare("UPDATE `$table` SET $string WHERE `$key` = ?");
             $statement->execute($valuesArray);
-            return (int)$ID;
+            return $ID;
         } catch(PDOException $e) {
             echo 'We have ERROR in set data!'.EOL;
             self::$error .= $e->getMessage().EOL;
@@ -388,13 +436,14 @@ class PDO_SQL
         }
     }
     
-    public static function delete_row($table,$ID): ?bool
+    public static function delete_row($table,$ID, string $identifier = 'ID'): ?bool
     {
         new self; if (!self::$connection) return null;
         
         try {
-            $statement = self::$connection->prepare("DELETE FROM `$table` WHERE `ID` = $ID");
-            $statement->execute();
+            $key = str_replace('`', '``', $identifier);
+            $statement = self::$connection->prepare("DELETE FROM `$table` WHERE `$key` = ?");
+            $statement->execute([$ID]);
             return true;
         } catch(PDOException $e) {
             echo 'We have ERROR on delete data!'.EOL;
@@ -403,12 +452,14 @@ class PDO_SQL
         }
     }
     
-    public static function update_one_value($table,$ID,$attribute,$value): ?bool
+    public static function update_one_value($table,$ID,$attribute,$value, string $identifier = 'ID'): ?bool
     {
         new self; if (!self::$connection) return null;
         try {
-            $statement = self::$connection->prepare("UPDATE `$table` SET `$attribute` = :value WHERE `ID` = $ID");
+            $key = str_replace('`', '``', $identifier);
+            $statement = self::$connection->prepare("UPDATE `$table` SET `$attribute` = :value WHERE `$key` = :id");
             $statement->bindValue(':value', $value);
+            $statement->bindValue(':id', $ID);
             $statement->execute();
             return true;
         } catch(PDOException $e) {

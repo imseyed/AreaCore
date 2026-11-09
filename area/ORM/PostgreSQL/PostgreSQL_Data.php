@@ -436,6 +436,9 @@ class PostgreSQL_Data
     {
         $this->table = $table;
         $this->calledClass = $calledClass;
+        if ($calledClass !== '' && method_exists($calledClass, 'identifier_column')) {
+            $this->sort = $this->quote($calledClass::identifier_column());
+        }
     }
     
     public function __get(string $name)
@@ -521,7 +524,7 @@ class PostgreSQL_Data
     
     private function is_numeric_or_boolean_column(string $column): bool
     {
-        if ($column === 'ID') {
+        if ($column === 'ID' && ($this->calledClass === '' || !property_exists($this->calledClass, $column))) {
             return true;
         }
         if ($this->calledClass === '' || !class_exists($this->calledClass)) {

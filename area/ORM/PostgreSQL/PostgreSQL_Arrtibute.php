@@ -7,6 +7,9 @@ use Attribute;
 class NoColumn {}
 
 #[Attribute(Attribute::TARGET_PROPERTY)]
+class Identifier {}
+
+#[Attribute(Attribute::TARGET_PROPERTY)]
 class Index {}
 
 #[Attribute(Attribute::TARGET_PROPERTY)]
